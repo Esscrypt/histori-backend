@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "template_version": 0
+  },
+  "fixtures": [
+    {
+      "name": "delete_subscription",
+      "path": "/v1/subscriptions/sub_1Q7wTaJnC1hFsrmeBIUVxtn3",
+      "method": "delete"
+    }
+  ]
+}

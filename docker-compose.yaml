@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # Postgres database service
+  db:
+    image: postgres:15
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    network_mode: "host"  # Use host network
+
+  # Backend service
+  backend:
+    build:
+      context: .
+      dockerfile: ${BACKEND_DOCKERFILE}
+    container_name: histori-backend
+    environment:
+      NODE_ENV: ${NODE_ENV}
+    depends_on:
+      - db
+    volumes:
+      - .:/usr/src/backend
+      - /usr/src/backend/node_modules
+    network_mode: "host"  # Use host network
+
+  # Frontend service
+  frontend:
+    build:
+      dockerfile: ${FRONTEND_DOCKERFILE}  # Use dynamic selection based on the .env file
+    container_name: histori-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NODE_ENV: ${NODE_ENV}
+      NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+    depends_on:
+      - backend
+    network_mode: "host"  # Use host network
+
+  # Stripe CLI listener service
+  stripe-listener:
+    image: stripe/stripe-cli
+    container_name: stripe-listener
+    entrypoint: >
+      sh -c "
+        stripe listen --forward-to localhost:4242/stripe/webhook
+      "
+    environment:
+      - STRIPE_API_KEY=${STRIPE_API_KEY}
+    depends_on:
+      - backend
+    network_mode: "host"  # Use host network
+
+volumes:
+  postgres-data:

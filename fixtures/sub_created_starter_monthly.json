@@ -1,0 +1,20 @@
+{
+  "_meta": {
+    "template_version": 0
+  },
+  "fixtures": [
+    {
+      "name": "subscription",
+      "path": "/v1/subscriptions",
+      "method": "post",
+      "params": {
+        "customer": "cus_QziCgZowi4yJcs",
+        "items": [
+          {
+            "price": "price_1Q0nFhJnC1hFsrmeODXhRZwC"
+          }
+        ]
+      }
+    }
+  ]
+}

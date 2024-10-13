@@ -1,0 +1,23 @@
+# Frontend Dockerfile (Development)
+FROM node:20
+
+# Set working directory
+WORKDIR /usr/src/frontend
+
+# Clone the frontend repository
+RUN git clone https://github.com/Esscrypt/histori-frontend.git .
+
+RUN npm install
+
+RUN npm run build
+
+# Set environment variables into the .env file
+# This is where we append the environment variables from the Docker environment into the .env file
+RUN echo NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} >> .env && echo NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${NEXT_PUBLIC_RECAPTCHA_SITE_KEY} >> .env
+
+
+# Expose the port the frontend runs on
+EXPOSE 3000
+
+# Serve the frontend in production mode
+CMD ["npm", "run", "dev"]

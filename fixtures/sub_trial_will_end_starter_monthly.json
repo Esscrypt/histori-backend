@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "template_version": 0
+  },
+  "fixtures": [
+    {
+      "name": "trial_will_end",
+      "path": "/v1/test_helpers/subscriptions/sub_1Q1uIEJnC1hFsrmemzmrFyV4/trigger_trial_will_end",
+      "method": "post"
+    }
+  ]
+}
