@@ -38,6 +38,12 @@ To stop the running containers, simply run:
 docker-compose down
 ```
 
+## Production docker-compose
+In production server run only the users database and the server:
+```bash
+docker-compose -f docker-compose.production.yml up --build -d
+```
+
 ## Terraform
 ```bash
 cd terraform && terraform init

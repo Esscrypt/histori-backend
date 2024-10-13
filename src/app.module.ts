@@ -23,7 +23,7 @@ import { AWSService } from './awsservice/awsservice.service';
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
         entities: [User],
-        synchronize: process.env.NODE_ENV === 'development', // Only synchronize in development
+        synchronize: true, // Only synchronize in development
       }),
       inject: [ConfigService],
     }),
