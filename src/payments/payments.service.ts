@@ -11,10 +11,19 @@ import { ConfigService } from '@nestjs/config';
 import { MailService } from 'src/auth/services/mail.service';
 import { AWSService } from 'src/awsservice/awsservice.service';
 
+import { Mutex } from 'async-mutex';
+
+
 @Injectable()
 export class PaymentsService {
   stripeClient: Stripe;
   private readonly logger = new Logger(PaymentsService.name);
+
+  // In-memory map to store processed event IDs
+  private processedEvents: Map<string, any> = new Map();
+
+  // Mutex for locking
+  private mutex: Mutex = new Mutex();
 
   constructor(
     @InjectStripeClient() stripeClient: Stripe,
@@ -26,47 +35,53 @@ export class PaymentsService {
     this.stripeClient = stripeClient;
   }
 
-  // Handle subscription creation with VPS provisioning
   @StripeWebhookHandler('customer.subscription.created')
   async handleSubscriptionCreated(
     evt: Stripe.CustomerSubscriptionCreatedEvent,
   ) {
-    const stripeCustomerId = evt.data.object.customer as string;
-    const user = await this.findUserByStripeId(stripeCustomerId);
+      const stripeEventId = evt.id; // Stripe event ID
 
-    if (user) {
-      const subscription = evt.data.object;
-      const productId = subscription.items.data[0].price.product as string;
-      const tier = this.getTierFromProductId(productId);
-      user.tier = tier;
-      user.requestCount = 0; // Reset request count
-      this.setRequestLimitForTier(user, tier);
+      const stripeCustomerId = evt.data.object.customer as string;
+      const user = await this.findUserByStripeId(stripeCustomerId);
 
-      await this.userRepository.save(user);
-      this.logger.log(`Updated user: ${user.email} to tier: ${tier}`);
-
-      // Provision AWS VPS for the user
-      if (user.useDedicatedServer && !user.serverProvisioned) {
-        const vpsIp = await this.awsService.provisionAwsVps(user);
-        user.serverIp = vpsIp;
-        user.serverProvisioned = true;
-        await this.userRepository.save(user);
-        this.logger.log(`Assigned VPS IP: ${vpsIp} to user: ${user.id}`);
-        this.logger.log(
-          `Assigned Dedicated API Key: ${user.apiKey} to user: ${user.id}`,
-        );
-      }
-      if (!user.useDedicatedServer) {
-        user.apiKey = await this.awsService.createAwsApiGatewayKey(user);
-        await this.userRepository.save(user);
-        this.logger.log(
-          `Assigned AWS API Key: ${user.apiKey} to user: ${user.id}`,
-        );
+      if (!user) {
+        this.logger.warn(`User not found for customer ID: ${stripeCustomerId}`);
+        return;
       }
 
-      await this.handleReferralBonus(user, subscription);
-    }
+      try {
+        const subscription = evt.data.object;
+        const productId = subscription.items.data[0].price.product as string;
+        const tier = this.getTierFromProductId(productId);
+
+        user.tier = tier;
+        user.requestCount = 0; // Reset request count
+        this.setRequestLimitForTier(user, tier);
+        this.logger.log(`Updated user: ${user.id} to tier: ${tier}`);
+
+        // Provision AWS VPS for the user
+        if (user.useDedicatedServer && !user.serverProvisioned) {
+          const vpsIp = await this.awsService.provisionAwsVps(user);
+          user.serverIp = vpsIp;
+          user.serverProvisioned = true;
+          this.logger.log(`Assigned VPS IP: ${vpsIp} to user: ${user.id}`);
+        }
+
+        if (!user.useDedicatedServer) {
+          user.apiKey = await this.awsService.createAwsApiGatewayKey(user);
+          this.logger.log(`Assigned AWS API Key: ${user.apiKey} to user: ${user.id}`);
+        }
+
+        await this.handleReferralBonus(user, subscription);
+
+        await this.userRepository.save(user);
+      } catch (error: any) {
+        this.logger.error(`Error processing subscription event: ${error.message}`);
+      }
+
   }
+
+
   private async handleReferralBonus(
     user: User,
     subscription: Stripe.Subscription,
@@ -80,7 +95,6 @@ export class PaymentsService {
         const amount = subscription.items.data[0].price.unit_amount / 100;
         const referralBonus = amount * 0.15;
         referrer.referralPoints += referralBonus;
-
         await this.userRepository.save(referrer);
         this.logger.log(
           `Added ${referralBonus} points to referrer: ${referrer.email}`,

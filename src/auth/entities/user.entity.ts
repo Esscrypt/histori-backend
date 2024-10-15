@@ -96,6 +96,12 @@ export class User {
   })
   instanceLocation: string;
 
+  @Column({default: false})
+  @ApiProperty({
+    description: 'If a subscription event is currently being processed'
+  })
+  processingSubscriptionEvent: boolean;
+
   @Column({ unique: true })
   @ApiProperty({ description: 'Referral code for the user to refer others' })
   referralCode: string;

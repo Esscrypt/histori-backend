@@ -41,5 +41,19 @@ services:
       - backend
     network_mode: "host"  # Use host network
 
+  # Stripe CLI listener service
+  stripe-listener:
+    image: stripe/stripe-cli
+    container_name: stripe-listener
+    entrypoint: >
+      sh -c "
+        stripe listen --forward-to localhost:4242/stripe/webhook
+      "
+    environment:
+      - STRIPE_API_KEY=${STRIPE_API_KEY}
+    depends_on:
+      - backend
+    network_mode: "host"  # Use host network
+
 volumes:
   postgres-data:
