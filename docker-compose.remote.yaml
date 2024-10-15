@@ -17,16 +17,14 @@ services:
   backend:
     build:
       context: .
-      dockerfile: ${BACKEND_DOCKERFILE}  # Ensure the production Dockerfile handles building for production
+      dockerfile: ${BACKEND_DOCKERFILE}
     container_name: histori-backend
     environment:
-      NODE_ENV: production  # Set to production
+      NODE_ENV: ${NODE_ENV}
     depends_on:
       - db
     volumes:
-      # You might not want to mount local volumes in production, so this is optional:
-      # - .:/usr/src/backend
-      # If needed, you can add a volume for persistent data storage
+      - .:/usr/src/backend
       - /usr/src/backend/node_modules
     network_mode: "host"  # Use host network
 
