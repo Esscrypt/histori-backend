@@ -8,7 +8,7 @@
       "path": "/v1/subscriptions",
       "method": "post",
       "params": {
-        "customer": "cus_QziCgZowi4yJcs",
+        "customer": "cus_R1bgZLbylJgKXh",
         "items": [
           {
             "price": "price_1Q0nFhJnC1hFsrmeODXhRZwC"

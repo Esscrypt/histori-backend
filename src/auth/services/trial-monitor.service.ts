@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { User } from 'src/auth/entities/user.entity';
 import * as moment from 'moment';
 import { MailService } from './mail.service';
+import { AWSService } from 'src/awsservice/awsservice.service';
 
 @Injectable()
 export class TrialMonitorService {
@@ -12,6 +13,7 @@ export class TrialMonitorService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly mailService: MailService,
+    private readonly awsService: AWSService
   ) {}
 
   // Run daily
@@ -24,7 +26,9 @@ export class TrialMonitorService {
 
       // If account is 21 days old and still on Free tier, set request limit to 0
       if (user.tier === 'Free' && accountAge >= 21) {
-        user.requestLimit = 0;
+        
+        await this.awsService.removeApiKey(user.apiKey);
+        user.apiKey = null;
         await this.userRepository.save(user);
         console.log(
           `User ${user.email} has been downgraded to request limit 0 due to trial expiration.`,

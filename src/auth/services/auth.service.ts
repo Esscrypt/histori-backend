@@ -19,7 +19,7 @@ import { PaymentsService } from 'src/payments/payments.service';
 import { OAuthService } from './oauth.service';
 import { HttpService } from '@nestjs/axios';
 import { ethers } from 'ethers';
-import { v4 as uuidv4 } from 'uuid';
+import { AWSService } from 'src/awsservice/awsservice.service';
 
 @Injectable()
 export class AuthService {
@@ -33,6 +33,7 @@ export class AuthService {
     private readonly paymentService: PaymentsService,
     private readonly oAuthService: OAuthService,
     private readonly httpService: HttpService,
+    private readonly awsService: AWSService,
   ) {}
 
   // Reusable method for creating a new user
@@ -44,18 +45,32 @@ export class AuthService {
     const stripeCustomerId =
       await this.paymentService.createStripeCustomer(email);
 
-    const apiKey = `HISTORI_${uuidv4().replace(/[^a-zA-Z0-9]/g, '')}`;
-
     const newUser = this.userRepository.create({
       email,
-      apiKey,
       githubId,
       stripeCustomerId,
       referrerCode,
       isActive: true,
     });
 
+    const apiKey = await this.awsService.createAwsApiGatewayKey(newUser);
+    newUser.apiKey = apiKey;
+    newUser.tier = 'Free'; // Default tier for new users
+    await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
+
     return await this.userRepository.save(newUser);
+  }
+
+  public async createApiKey(userId: number): Promise<string> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new BadRequestException('User not found');
+    if(user.apiKey) {
+      throw new BadRequestException('User already has an API key');
+    }
+    const apiKey = await this.awsService.createAwsApiGatewayKey(user);
+    user.apiKey = apiKey;
+    await this.userRepository.save(user);
+    return apiKey;
   }
 
   // Reusable method for generating access and refresh tokens
@@ -142,7 +157,6 @@ export class AuthService {
       await this.paymentService.createStripeCustomer(email);
 
     const user = this.userRepository.create({
-      apiKey: `HISTORI_${uuidv4().replace(/[^a-zA-Z0-9]/g, '')}`,
       email,
       password,
       isActive: false,
@@ -150,6 +164,10 @@ export class AuthService {
       stripeCustomerId,
     });
 
+    const apiKey = await this.awsService.createAwsApiGatewayKey(user);
+    user.apiKey = apiKey;
+    user.tier = 'Free'; // Default tier for new users
+    await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
     const newUser = await this.userRepository.save(user);
 
     return await this.sendConfirmation(email, newUser.id);
@@ -170,7 +188,7 @@ export class AuthService {
 
     await this.mailService.sendUserConfirmation(email, confirmationToken);
     return { message: 'Confirmation email has been sent' };
-  }
+  }п
 
   // Find a user by email or userId
   private async findUserByEmail(email: string, userId?: number): Promise<User> {
@@ -249,13 +267,17 @@ export class AuthService {
       const stripeCustomerId = await this.paymentService.createStripeCustomer();
       // Optionally, you can validate the wallet address further if necessary
       user = this.userRepository.create({
-        apiKey: `HISTORI_${uuidv4().replace(/[^a-zA-Z0-9]/g, '')}`,
         web3Address: walletAddress,
         isActive: true, // Assuming new wallet-based users are active by default
         email: '', // Since it's a wallet-based login, you may not have an email
         stripeCustomerId, // stripeCustomerId,
         referrerCode: referrer,
       });
+
+      const apiKey = await this.awsService.createAwsApiGatewayKey(user);
+      user.apiKey = apiKey;
+      user.tier = 'Free'; // Default tier for new users
+      await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
       await this.userRepository.save(user);
     }
 
@@ -367,6 +389,7 @@ export class AuthService {
   }
 
   async getUserProfile(userId: number): Promise<any> {
+
     const user = await this.userRepository.findOne({
       where: { id: userId },
       select: [
@@ -377,9 +400,31 @@ export class AuthService {
         'requestLimit',
         'referralCode',
         'referralPoints',
-        'serverProvisioned',
       ],
     });
+
+    if (!user) {
+      throw new Error(`User with ID ${userId} not found`);
+    }
+
+    const currentDate = new Date();
+    const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+      .toISOString()
+      .split('T')[0]; // Format: YYYY-MM-DD
+    const endDate = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+
+    // Fetch the current request count from AWS
+    try {
+      const currentRequestCount = await this.awsService.getRequestCountForApiKey(
+        user,
+        startDate,
+        endDate,
+      );
+      user.requestCount = currentRequestCount; // Update the requestCount from AWS
+    } catch (error) {
+      throw new Error(`Failed to get request count for user: ${error.message}`);
+    }
+    
     return user;
   }
 

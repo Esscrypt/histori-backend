@@ -38,6 +38,14 @@ To stop the running containers, simply run:
 docker-compose down
 ```
 
+## Docker on Staging Server
+```bash
+ssh root@84.247.177.43
+cd histori-backend
+docker compose -f docker-compose.remote.yaml build --no-cache
+```
+
+
 ## Production docker-compose
 In production server run only the users database and the server:
 ```bash

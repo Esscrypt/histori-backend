@@ -53,9 +53,9 @@ export class User {
   stripeCustomerId: string;
 
   @Index() // Add index to the apiKey for faster lookup
-  @Column({ nullable: false })
+  @Column({ nullable: true })
   @ApiProperty({ description: 'API key for the user to access APIs' })
-  apiKey: string;
+  apiKey?: string;
 
   @Column({
     type: 'enum',
@@ -88,19 +88,13 @@ export class User {
   })
   @IsOptional()
   @IsEthereumAddress({ message: 'Invalid Ethereum wallet address' })
-  web3Address?: string; // New column for Web3 wallet address
+  web3Address?: string;
 
   @Column({ default: 'us-east-1' })
   @ApiPropertyOptional({
     description: 'Instance location for the API server',
   })
   instanceLocation: string;
-
-  @Column({default: false})
-  @ApiProperty({
-    description: 'If a subscription event is currently being processed'
-  })
-  processingSubscriptionEvent: boolean;
 
   @Column({ unique: true })
   @ApiProperty({ description: 'Referral code for the user to refer others' })
@@ -114,34 +108,18 @@ export class User {
   @ApiProperty({ description: 'Referral points accumulated by the user' })
   referralPoints: number;
 
-  @Column({ default: 'https://api.histori.xyz/v1' }) // New field for server IP
-  @ApiPropertyOptional({
-    description: 'IP address of the server associated with the user',
-  })
-  serverIp: string;
-
-  @Column({ default: false }) // New field for server provisioning flag
-  @ApiPropertyOptional({
-    description: 'Flag to indicate dedicated server is provisioned',
-  })
-  @IsOptional()
-  serverProvisioned: boolean;
-
-  @Column({ default: false })
-  @IsOptional()
-  @ApiPropertyOptional({
-    description:
-      'Weather or not to use a Dedicated server associated with the user',
-  })
-  useDedicatedServer: boolean;
-
   @CreateDateColumn()
   @ApiProperty({ description: 'The date the user was created' })
   createdAt: Date;
 
-  @UpdateDateColumn()
-  @ApiProperty({ description: 'The last date the user was updated' })
-  updatedAt: Date;
+  @Column({ nullable: true })
+  @ApiPropertyOptional({
+    description: 'Current Stripe subscription ID for the user',
+  })
+  subscriptionId?: string;  // Store the current active subscription ID
+
+  @Column({ nullable: true })
+  lastIdempotencyKey?: string;
 
   private tempPassword: string;
 

@@ -117,12 +117,12 @@ export class AuthController {
     return this.authService.register(createUserDto);
   }
 
-  @Post('update-email')
+  @Post('create-email')
   @UseGuards(TokenAuthGuard)
-  @ApiOperation({ summary: 'Update existing user email' })
+  @ApiOperation({ summary: 'Set user email' })
   @ApiResponse({
     status: 200,
-    description: 'Confirmation email resent successfully.',
+    description: 'Confirmation email sent successfully.',
   })
   @ApiBadRequestResponse({
     description: 'Invalid email or user not found.',
@@ -130,6 +130,21 @@ export class AuthController {
   async updateEmail(@Body() mailChangeDto: MailChangeDto, @Req() req) {
     this.logger.log(`Updating confirmation email for: ${mailChangeDto.email}`);
     return this.authService.sendConfirmation(mailChangeDto.email, req.user.id);
+  }
+
+  @Post('create-api-key')
+  @UseGuards(TokenAuthGuard)
+  @ApiOperation({ summary: 'Create API key' })
+  @ApiResponse({
+    status: 200,
+    description: 'API key created successfully.',
+  })
+  @ApiBadRequestResponse({
+    description: 'Failed to create API key.',
+  })
+  async createApiKey(@Req() req) {
+    this.logger.log(`Creating API key for user ID: ${req.user.id}`);
+    return this.authService.createApiKey(req.user.id);
   }
 
   @Post('resend-confirmation')

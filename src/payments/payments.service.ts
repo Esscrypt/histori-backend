@@ -11,19 +11,10 @@ import { ConfigService } from '@nestjs/config';
 import { MailService } from 'src/auth/services/mail.service';
 import { AWSService } from 'src/awsservice/awsservice.service';
 
-import { Mutex } from 'async-mutex';
-
-
 @Injectable()
 export class PaymentsService {
   stripeClient: Stripe;
   private readonly logger = new Logger(PaymentsService.name);
-
-  // In-memory map to store processed event IDs
-  private processedEvents: Map<string, any> = new Map();
-
-  // Mutex for locking
-  private mutex: Mutex = new Mutex();
 
   constructor(
     @InjectStripeClient() stripeClient: Stripe,
@@ -39,48 +30,95 @@ export class PaymentsService {
   async handleSubscriptionCreated(
     evt: Stripe.CustomerSubscriptionCreatedEvent,
   ) {
-      const stripeEventId = evt.id; // Stripe event ID
-
       const stripeCustomerId = evt.data.object.customer as string;
       const user = await this.findUserByStripeId(stripeCustomerId);
-
+  
       if (!user) {
         this.logger.warn(`User not found for customer ID: ${stripeCustomerId}`);
         return;
       }
-
+  
       try {
-        const subscription = evt.data.object;
-        const productId = subscription.items.data[0].price.product as string;
-        const tier = this.getTierFromProductId(productId);
+        const newSubscription = evt.data.object;
+        const newSubscriptionId = newSubscription.id as string;
+        const productId = newSubscription.items.data[0].price.product as string;
+        const newTier = this.getTierFromProductId(productId);
 
-        user.tier = tier;
-        user.requestCount = 0; // Reset request count
-        this.setRequestLimitForTier(user, tier);
-        this.logger.log(`Updated user: ${user.id} to tier: ${tier}`);
-
-        // Provision AWS VPS for the user
-        if (user.useDedicatedServer && !user.serverProvisioned) {
-          const vpsIp = await this.awsService.provisionAwsVps(user);
-          user.serverIp = vpsIp;
-          user.serverProvisioned = true;
-          this.logger.log(`Assigned VPS IP: ${vpsIp} to user: ${user.id}`);
+        if(user.subscriptionId && user.subscriptionId === newSubscriptionId) {
+          this.logger.log(`Subscription already exists for user: ${user.id}`);
+          return;
         }
 
-        if (!user.useDedicatedServer) {
-          user.apiKey = await this.awsService.createAwsApiGatewayKey(user);
-          this.logger.log(`Assigned AWS API Key: ${user.apiKey} to user: ${user.id}`);
+        if (user.subscriptionId) {
+          try {
+            await this.stripeClient.subscriptions.cancel(user.subscriptionId);  // Delete the previous subscription
+            this.logger.log(`Deleted previous subscription: ${user.subscriptionId} for user: ${user.id}`);
+          } catch (error) {
+            this.logger.error(`Failed to delete previous subscription ${user.subscriptionId} for user: ${user.id}`, error.message);
+          }
+        }
+        if(user.tier !== newTier ) {
+          await this.awsService.associateKeyWithUsagePlan(user.apiKey, user.tier, newTier);
+          this.logger.log(`Updated usage plan for user: ${user.id} from ${user.tier} to ${newTier}`);
+        }
+        else {
+          this.logger.log(`Usage plan for user: ${user.id} remains the same: ${user.tier}`);
         }
 
-        await this.handleReferralBonus(user, subscription);
+        user.subscriptionId = newSubscriptionId;
+        user.requestLimit = await this.awsService.getTotalRequestCountForUsagePlan(user);
+        user.tier = newTier;
+
+        await this.handleReferralBonus(user, newSubscription);
 
         await this.userRepository.save(user);
+  
       } catch (error: any) {
         this.logger.error(`Error processing subscription event: ${error.message}`);
       }
-
   }
 
+  @StripeWebhookHandler('customer.subscription.deleted')
+  async handleSubscriptionDeleted(
+    evt: Stripe.CustomerSubscriptionDeletedEvent,
+  ) {
+    const stripeCustomerId = evt.data.object.customer as string;
+    const user = await this.findUserByStripeId(stripeCustomerId);
+  
+    if (!user) {
+      this.logger.warn(`User not found for customer ID: ${stripeCustomerId}`);
+      return;
+    }
+
+    try {
+      const oldSubscription = evt.data.object;
+      const deletedSubscriptionId = oldSubscription.id as string;
+      console.log('Subscription deleted:', deletedSubscriptionId);
+      console.log('Current subscription:', user.subscriptionId);
+      if(user.subscriptionId === deletedSubscriptionId && user.apiKey) { // Deletion is due to user termination, not cancellation (upgrade)
+        await this.awsService.removeApiKey(user.apiKey);
+        user.apiKey = null;
+        await this.userRepository.save(user);
+        console.log("User terminated subscription");
+      }
+
+    } catch (error: any) {
+      this.logger.error(`Error processing subscription event: ${error.message}`);
+    }
+  }
+
+  @StripeWebhookHandler('customer.subscription.trial_will_end')
+  async handleTrialWillEnd(evt: Stripe.CustomerSubscriptionTrialWillEndEvent) {
+    const stripeCustomerId = evt.data.object.customer as string;
+    const user = await this.findUserByStripeId(stripeCustomerId);
+
+    if (user) {
+      await this.mailService.sendTrialEndingEmail(user.email);
+      this.logger.log(`Trial ending email sent to user: ${user.email}`);
+    } else {
+      this.logger.warn(`User not found for customer ID: ${stripeCustomerId}`);
+    }
+  }
 
   private async handleReferralBonus(
     user: User,
@@ -105,55 +143,6 @@ export class PaymentsService {
     }
   }
 
-  // Handle subscription deletion with VPS teardown
-  @StripeWebhookHandler('customer.subscription.deleted')
-  async handleSubscriptionDeleted(
-    evt: Stripe.CustomerSubscriptionDeletedEvent,
-  ) {
-    const stripeCustomerId = evt.data.object.customer as string;
-    const user = await this.findUserByStripeId(stripeCustomerId);
-
-    if (user) {
-      // Downgrade to 'Free' tier
-      user.tier = 'Free';
-      this.setRequestLimitForTier(user, 'Free');
-      await this.userRepository.save(user);
-
-      this.logger.log(
-        `Subscription deleted for user: ${user.email}, downgraded to Free tier.`,
-      );
-      if (user.serverProvisioned) {
-        // Teardown AWS VPS for this user using their user ID
-        await this.awsService.teardownAwsVps(user);
-        user.serverProvisioned = false;
-        user.serverIp = '';
-        await this.userRepository.save(user);
-      }
-    }
-  }
-
-  @StripeWebhookHandler('customer.subscription.trial_will_end')
-  async handleTrialWillEnd(evt: Stripe.CustomerSubscriptionTrialWillEndEvent) {
-    const stripeCustomerId = evt.data.object.customer as string;
-    const user = await this.findUserByStripeId(stripeCustomerId);
-
-    if (user) {
-      await this.mailService.sendTrialEndingEmail(user.email);
-      this.logger.log(`Trial ending email sent to user: ${user.email}`);
-    } else {
-      this.logger.warn(`User not found for customer ID: ${stripeCustomerId}`);
-    }
-  }
-
-  private setRequestLimitForTier(user: User, tier: string): void {
-    const limits = {
-      Free: 5000,
-      Starter: 50000,
-      Growth: 300000,
-      Business: 700000,
-    };
-    user.requestLimit = limits[tier] || 5000;
-  }
   // Map product IDs to tiers
   private getTierFromProductId(productId: string): string {
     const tierMap = {
