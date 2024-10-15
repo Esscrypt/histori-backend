@@ -49,6 +49,7 @@ export class PaymentsService {
           return;
         }
 
+        // Cancel the previous subscription if it exists
         if (user.subscriptionId) {
           try {
             await this.stripeClient.subscriptions.cancel(user.subscriptionId);  // Delete the previous subscription
@@ -57,6 +58,12 @@ export class PaymentsService {
             this.logger.error(`Failed to delete previous subscription ${user.subscriptionId} for user: ${user.id}`, error.message);
           }
         }
+
+        if(!user.apiKey) {
+          user.apiKey = await this.awsService.createAwsApiGatewayKey(user);
+          this.logger.log(`Created new API key for user: ${user.id}`);
+        }
+
         if(user.tier !== newTier ) {
           await this.awsService.associateKeyWithUsagePlan(user.apiKey, user.tier, newTier);
           this.logger.log(`Updated usage plan for user: ${user.id} from ${user.tier} to ${newTier}`);
