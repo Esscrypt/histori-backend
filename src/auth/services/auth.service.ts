@@ -45,7 +45,7 @@ export class AuthService {
     const stripeCustomerId =
       await this.paymentService.createStripeCustomer(email);
 
-    const newUser = this.userRepository.create({
+    const user = this.userRepository.create({
       email,
       githubId,
       stripeCustomerId,
@@ -53,24 +53,14 @@ export class AuthService {
       isActive: true,
     });
 
+    const newUser = await this.userRepository.save(user);
+
     const apiKey = await this.awsService.createAwsApiGatewayKey(newUser);
     newUser.apiKey = apiKey;
     newUser.tier = 'Free'; // Default tier for new users
     await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
 
     return await this.userRepository.save(newUser);
-  }
-
-  public async createApiKey(userId: number): Promise<string> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new BadRequestException('User not found');
-    if(user.apiKey) {
-      throw new BadRequestException('User already has an API key');
-    }
-    const apiKey = await this.awsService.createAwsApiGatewayKey(user);
-    user.apiKey = apiKey;
-    await this.userRepository.save(user);
-    return apiKey;
   }
 
   // Reusable method for generating access and refresh tokens
@@ -164,11 +154,13 @@ export class AuthService {
       stripeCustomerId,
     });
 
-    const apiKey = await this.awsService.createAwsApiGatewayKey(user);
-    user.apiKey = apiKey;
-    user.tier = 'Free'; // Default tier for new users
-    await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
     const newUser = await this.userRepository.save(user);
+
+    const apiKey = await this.awsService.createAwsApiGatewayKey(newUser);
+    newUser.apiKey = apiKey;
+    newUser.tier = 'Free'; // Default tier for new users
+    await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
+    await this.userRepository.save(newUser);
 
     return await this.sendConfirmation(email, newUser.id);
   }
@@ -274,11 +266,13 @@ export class AuthService {
         referrerCode: referrer,
       });
 
+      const newUser = await this.userRepository.save(user);
+
       const apiKey = await this.awsService.createAwsApiGatewayKey(user);
-      user.apiKey = apiKey;
-      user.tier = 'Free'; // Default tier for new users
+      newUser.apiKey = apiKey;
+      newUser.tier = 'Free'; // Default tier for new users
       await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
-      await this.userRepository.save(user);
+      await this.userRepository.save(newUser);
     }
 
     return this.generateTokens(user);

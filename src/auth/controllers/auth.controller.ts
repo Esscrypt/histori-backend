@@ -132,20 +132,6 @@ export class AuthController {
     return this.authService.sendConfirmation(mailChangeDto.email, req.user.id);
   }
 
-  @Post('create-api-key')
-  @UseGuards(TokenAuthGuard)
-  @ApiOperation({ summary: 'Create API key' })
-  @ApiResponse({
-    status: 200,
-    description: 'API key created successfully.',
-  })
-  @ApiBadRequestResponse({
-    description: 'Failed to create API key.',
-  })
-  async createApiKey(@Req() req) {
-    this.logger.log(`Creating API key for user ID: ${req.user.id}`);
-    return this.authService.createApiKey(req.user.id);
-  }
 
   @Post('resend-confirmation')
   @ApiOperation({ summary: 'Resend email confirmation link' })
