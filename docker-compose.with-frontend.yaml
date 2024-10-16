@@ -28,5 +28,18 @@ services:
       - /usr/src/backend/node_modules
     network_mode: "host"  # Use host network
 
+  # Frontend service
+  frontend:
+    build:
+      dockerfile: ${FRONTEND_DOCKERFILE}  # Use dynamic selection based on the .env file
+    container_name: histori-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NODE_ENV: ${NODE_ENV}
+      NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+    depends_on:
+      - backend
+    network_mode: "host"  # Use host network
+
 volumes:
   postgres-data:

@@ -43,6 +43,10 @@ docker-compose down
 ssh root@84.247.177.43
 cd histori-backend
 docker compose -f docker-compose.remote.yaml build --no-cache
+
+# TO prune everything (containers, volumes) in case of staleness:
+docker system prune -a --volumes
+
 ```
 
 

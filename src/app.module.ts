@@ -10,6 +10,8 @@ import { MailService } from './auth/services/mail.service';
 import { PaymentsController } from './payments/payments.controller';
 import { JwtService } from '@nestjs/jwt';
 import { AWSService } from './awsservice/awsservice.service';
+import { UsagePlansModule } from './usage-plans/usage-plans.module';
+import { UsagePlan } from './usage-plans/entities/usage-plan.entity';
 
 @Module({
   imports: [
@@ -22,7 +24,7 @@ import { AWSService } from './awsservice/awsservice.service';
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
-        entities: [User],
+        entities: [User, UsagePlan],
         synchronize: true, // Only synchronize in development
       }),
       inject: [ConfigService],
@@ -48,6 +50,7 @@ import { AWSService } from './awsservice/awsservice.service';
       inject: [ConfigService],
     }),
     AuthModule,
+    UsagePlansModule,
   ],
   providers: [Logger, PaymentsService, MailService, JwtService, AWSService],
   controllers: [PaymentsController],

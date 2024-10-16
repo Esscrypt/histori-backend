@@ -13,7 +13,6 @@ import {
   GetUsageCommandInput,
   GetUsagePlanCommand,
   GetUsagePlanCommandInput,
-  GetUsagePlanKeysCommand,
 } from '@aws-sdk/client-api-gateway'; // Import v3 commands and clients
 import { exec } from 'child_process';
 
@@ -22,10 +21,10 @@ export class AWSService {
   private readonly logger = new Logger(AWSService.name);
 
   private readonly usagePlanMapping: Record<string, string> = {
-    Free: 'u3xg47',      // Free tier usage plan ID
-    Starter: '2kks9j',   // Starter tier usage plan ID
-    Growth: '2pkmuh',    // Growth tier usage plan ID
-    Business: 'ujz9a5',  // Business tier usage plan ID
+    Free: '3r3phz',      // Free tier usage plan ID
+    Starter: 'czyd8s',   // Starter tier usage plan ID
+    Growth: 'rwpes6',    // Growth tier usage plan ID
+    Business: 'wtdvwl',  // Business tier usage plan ID
   };
 
   apiGateway: APIGatewayClient;
@@ -38,6 +37,42 @@ export class AWSService {
       },
       region: this.configService.get<string>('AWS_REGION') || 'us-east-1',
     });
+  }
+
+  // Fetch information for all available usage plans by ID
+  async getUsagePlans() {
+    const usagePlanIds = Object.values(this.usagePlanMapping); // Get all usage plan IDs
+    const usagePlans = [];
+
+    for (const usagePlanId of usagePlanIds) {
+      const params: GetUsagePlanCommandInput = {
+        usagePlanId, // Usage plan ID to fetch details for
+      };
+
+      try {
+        const getUsagePlanCommand = new GetUsagePlanCommand(params);
+        const usagePlanResponse = await this.apiGateway.send(getUsagePlanCommand);
+
+        // Format the response to match the UsagePlanDto
+        const formattedPlan = {
+          id: usagePlanId,
+          name: usagePlanResponse.name || null,
+          description: usagePlanResponse.description || null,
+          requestsPerSecond: usagePlanResponse.throttle?.rateLimit || null,
+          burstRequestsPerSecond: usagePlanResponse.throttle?.burstLimit || null,
+          requestsPerMonth: usagePlanResponse.quota?.limit || null,
+        };
+
+        usagePlans.push(formattedPlan);
+      } catch (error) {
+        this.logger.error(
+          `Failed to fetch details for usage plan ID: ${usagePlanId}`,
+          error.message,
+        );
+      }
+    }
+
+    return usagePlans;
   }
 
  // Method to generate AWS API Gateway Key
