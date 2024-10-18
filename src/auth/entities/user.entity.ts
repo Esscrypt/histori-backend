@@ -6,8 +6,8 @@ import {
   BeforeUpdate,
   AfterLoad,
   CreateDateColumn,
-  UpdateDateColumn,
   Index,
+  BeforeRemove,
 } from 'typeorm';
 import * as bcrypt from 'bcryptjs'; // or 'bcryptjs'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -20,6 +20,9 @@ import {
   MinLength,
 } from 'class-validator';
 import { v4 as uuidv4 } from 'uuid';
+
+import { Inject } from '@nestjs/common';
+import { AWSService } from 'src/awsservice/awsservice.service';
 
 @Entity('user')
 export class User {
@@ -116,7 +119,7 @@ export class User {
   @ApiPropertyOptional({
     description: 'Current Stripe subscription ID for the user',
   })
-  subscriptionId?: string;  // Store the current active subscription ID
+  subscriptionId?: string; // Store the current active subscription ID
 
   @Column({ nullable: true })
   lastIdempotencyKey?: string;
@@ -148,5 +151,24 @@ export class User {
 
   async compareApiKey(providedApiKey: string): Promise<boolean> {
     return this.apiKey === providedApiKey;
+  }
+
+  constructor(
+    @Inject(AWSService) private readonly awsService: AWSService, // Inject AWSService
+  ) {}
+
+  // Before deleting the user, remove the API key using the AWS service
+  @BeforeRemove()
+  async removeApiKey() {
+    if (this.apiKey) {
+      try {
+        await this.awsService.removeApiKey(this.apiKey);
+        console.log(`API key ${this.apiKey} deleted from AWS.`);
+      } catch (error) {
+        throw new Error(
+          `Failed to delete API key ${this.apiKey}: ${error.message}`,
+        );
+      }
+    }
   }
 }

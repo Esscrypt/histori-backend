@@ -1,10 +1,10 @@
 // usage-plans/entities/usage-plan.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryColumn } from 'typeorm';
 
 @Entity()
 export class UsagePlan {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryColumn()
+  id: string;
 
   @Column()
   name: string;
@@ -13,13 +13,16 @@ export class UsagePlan {
   description?: string;
 
   @Column({ nullable: true })
-  stripeProductId?: string;
+  stripeLookupKeyMonthly: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  priceMonthly: number;
+  @Column({ nullable: true })
+  stripeLookupKeyYearly: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  priceYearly: number;
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  priceMonthly?: number;
+
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  priceYearly?: number;
 
   @Column({ type: 'int', nullable: true })
   requestsPerMonth?: number;

@@ -30,59 +30,73 @@ export class PaymentsService {
   async handleSubscriptionCreated(
     evt: Stripe.CustomerSubscriptionCreatedEvent,
   ) {
-      const stripeCustomerId = evt.data.object.customer as string;
-      const user = await this.findUserByStripeId(stripeCustomerId);
-  
-      if (!user) {
-        this.logger.warn(`User not found for customer ID: ${stripeCustomerId}`);
+    const stripeCustomerId = evt.data.object.customer as string;
+    const user = await this.findUserByStripeId(stripeCustomerId);
+
+    if (!user) {
+      this.logger.warn(`User not found for customer ID: ${stripeCustomerId}`);
+      return;
+    }
+
+    try {
+      const newSubscription = evt.data.object;
+      const newSubscriptionId = newSubscription.id as string;
+      const productId = newSubscription.items.data[0].price.product as string;
+      const newTier = this.getTierFromProductId(productId);
+
+      if (user.subscriptionId && user.subscriptionId === newSubscriptionId) {
+        this.logger.log(`Subscription already exists for user: ${user.id}`);
         return;
       }
-  
-      try {
-        const newSubscription = evt.data.object;
-        const newSubscriptionId = newSubscription.id as string;
-        const productId = newSubscription.items.data[0].price.product as string;
-        const newTier = this.getTierFromProductId(productId);
 
-        if(user.subscriptionId && user.subscriptionId === newSubscriptionId) {
-          this.logger.log(`Subscription already exists for user: ${user.id}`);
-          return;
+      // Cancel the previous subscription if it exists
+      if (user.subscriptionId) {
+        try {
+          await this.stripeClient.subscriptions.cancel(user.subscriptionId); // Delete the previous subscription
+          this.logger.log(
+            `Deleted previous subscription: ${user.subscriptionId} for user: ${user.id}`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to delete previous subscription ${user.subscriptionId} for user: ${user.id}`,
+            error.message,
+          );
         }
-
-        // Cancel the previous subscription if it exists
-        if (user.subscriptionId) {
-          try {
-            await this.stripeClient.subscriptions.cancel(user.subscriptionId);  // Delete the previous subscription
-            this.logger.log(`Deleted previous subscription: ${user.subscriptionId} for user: ${user.id}`);
-          } catch (error) {
-            this.logger.error(`Failed to delete previous subscription ${user.subscriptionId} for user: ${user.id}`, error.message);
-          }
-        }
-
-        if(!user.apiKey) {
-          user.apiKey = await this.awsService.createAwsApiGatewayKey(user);
-          this.logger.log(`Created new API key for user: ${user.id}`);
-        }
-
-        if(user.tier !== newTier ) {
-          await this.awsService.associateKeyWithUsagePlan(user.apiKey, user.tier, newTier);
-          this.logger.log(`Updated usage plan for user: ${user.id} from ${user.tier} to ${newTier}`);
-        }
-        else {
-          this.logger.log(`Usage plan for user: ${user.id} remains the same: ${user.tier}`);
-        }
-
-        user.subscriptionId = newSubscriptionId;
-        user.requestLimit = await this.awsService.getTotalRequestCountForUsagePlan(user);
-        user.tier = newTier;
-
-        await this.handleReferralBonus(user, newSubscription);
-
-        await this.userRepository.save(user);
-  
-      } catch (error: any) {
-        this.logger.error(`Error processing subscription event: ${error.message}`);
       }
+
+      if (!user.apiKey) {
+        user.apiKey = await this.awsService.createAwsApiGatewayKey(user);
+        this.logger.log(`Created new API key for user: ${user.id}`);
+      }
+
+      if (user.tier !== newTier) {
+        await this.awsService.associateKeyWithUsagePlan(
+          user.apiKey,
+          user.tier,
+          newTier,
+        );
+        this.logger.log(
+          `Updated usage plan for user: ${user.id} from ${user.tier} to ${newTier}`,
+        );
+      } else {
+        this.logger.log(
+          `Usage plan for user: ${user.id} remains the same: ${user.tier}`,
+        );
+      }
+
+      user.subscriptionId = newSubscriptionId;
+      user.requestLimit =
+        await this.awsService.getTotalRequestCountForUsagePlan(user);
+      user.tier = newTier;
+
+      await this.handleReferralBonus(user, newSubscription);
+
+      await this.userRepository.save(user);
+    } catch (error: any) {
+      this.logger.error(
+        `Error processing subscription event: ${error.message}`,
+      );
+    }
   }
 
   @StripeWebhookHandler('customer.subscription.deleted')
@@ -91,7 +105,7 @@ export class PaymentsService {
   ) {
     const stripeCustomerId = evt.data.object.customer as string;
     const user = await this.findUserByStripeId(stripeCustomerId);
-  
+
     if (!user) {
       this.logger.warn(`User not found for customer ID: ${stripeCustomerId}`);
       return;
@@ -102,15 +116,17 @@ export class PaymentsService {
       const deletedSubscriptionId = oldSubscription.id as string;
       console.log('Subscription deleted:', deletedSubscriptionId);
       console.log('Current subscription:', user.subscriptionId);
-      if(user.subscriptionId === deletedSubscriptionId && user.apiKey) { // Deletion is due to user termination, not cancellation (upgrade)
+      if (user.subscriptionId === deletedSubscriptionId && user.apiKey) {
+        // Deletion is due to user termination, not cancellation (upgrade)
         await this.awsService.removeApiKey(user.apiKey);
         user.apiKey = null;
         await this.userRepository.save(user);
-        console.log("User terminated subscription");
+        console.log('User terminated subscription');
       }
-
     } catch (error: any) {
-      this.logger.error(`Error processing subscription event: ${error.message}`);
+      this.logger.error(
+        `Error processing subscription event: ${error.message}`,
+      );
     }
   }
 

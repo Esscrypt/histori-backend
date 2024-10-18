@@ -15,11 +15,12 @@ import { join } from 'path';
 import { OAuthService } from './services/oauth.service';
 import { HttpModule } from '@nestjs/axios';
 import { AWSService } from 'src/awsservice/awsservice.service';
+import { UsagePlan } from 'src/usage-plans/entities/usage-plan.entity';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, UsagePlan]),
     StripeModule.forRootAsync(StripeModule, {
       useFactory: (configService: ConfigService) => ({
         apiKey: configService.get<string>('STRIPE_SECRET_KEY'),

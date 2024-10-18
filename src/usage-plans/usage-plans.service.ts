@@ -14,28 +14,13 @@ export class UsagePlansService {
     private readonly usagePlanRepository: Repository<UsagePlan>,
   ) {}
 
-  private readonly usagePlanMapping: Record<string, string> = {
-    '3r3phz': 'Free',      // Free tier usage plan ID
-    'czyd8s': 'Starter',   // Starter tier usage plan ID
-    'rwpes6': 'Growth',    // Growth tier usage plan ID
-    'wtdvwl': 'Business',  // Business tier usage plan ID
-  };
-
-  private readonly productMapping: Record<string, string> = {
-    Starter: 'prod_Qm8v7qrPXe57FY',
-    Growth: 'prod_Qs8muZH1YGmilO',
-    Business: 'prod_Qs8nm4g18RXJmY',
-  };
-
   private readonly priceMonthlyMapping: Record<string, number> = {
-    Free: 0,
     Starter: 50,
     Growth: 200,
     Business: 400,
   };
 
   private readonly priceYearlyMapping: Record<string, number> = {
-    Free: 0,
     Starter: 45,
     Growth: 180,
     Business: 360,
@@ -44,51 +29,62 @@ export class UsagePlansService {
   async getUsagePlans(): Promise<UsagePlanDto[]> {
     // Check if usage plans are available in the database
     const existingUsagePlans = await this.usagePlanRepository.find();
-    
+
     if (existingUsagePlans.length > 0) {
       // If usage plans are found in the database, return them mapped to DTOs
-      return existingUsagePlans.map(plan => ({
-        name: plan.name,
-        description: plan.description,
-        stripeProductId: plan.stripeProductId,
-        priceMonthly: plan.priceMonthly,
-        priceYearly: plan.priceYearly,
-        requestsPerMonth: plan.requestsPerMonth,
-        requestsPerSecond: plan.requestsPerSecond,
-        burstRequestsPerSecond: plan.burstRequestsPerSecond,
-      }));
+      return existingUsagePlans.map((plan) => {
+        console.log(plan);
+        const dto = {
+          name: plan.name,
+          description: plan.description,
+          stripeLookupKeyMonthly:
+            plan.name !== 'Free' ? plan.stripeLookupKeyMonthly : null,
+          stripeLookupKeyYearly:
+            plan.name !== 'Free' ? plan.stripeLookupKeyYearly : null,
+          priceMonthly: plan.name !== 'Free' ? plan.priceMonthly : null,
+          priceYearly: plan.name !== 'Free' ? plan.priceYearly : null,
+          requestsPerMonth: plan.requestsPerMonth,
+          requestsPerSecond: plan.requestsPerSecond,
+          burstRequestsPerSecond: plan.burstRequestsPerSecond,
+        };
+        return dto;
+      });
     }
 
     // If no usage plans are found in the database, fetch from AWS
     const awsUsagePlans = await this.awsService.getUsagePlans();
 
     // Map the AWS response to the UsagePlan entity and save to the database
-    const usagePlans = awsUsagePlans.map((plan: any) => {
-      const tierName = this.usagePlanMapping[plan.id];
-      const productId = this.productMapping[tierName];
-      const priceMonthly = this.priceMonthlyMapping[tierName];
-      const priceYearly = this.priceYearlyMapping[tierName];
+    const usagePlans = awsUsagePlans
+      .filter((p) => p.name !== 'Dev')
+      .map((plan: any) => {
+        console.log(plan);
+        const priceMonthly = this.priceMonthlyMapping[plan.name];
+        const priceYearly = this.priceYearlyMapping[plan.name];
 
-      return this.usagePlanRepository.create({
-        name: plan.name,
-        description: plan.description,
-        stripeProductId: productId || null,
-        priceMonthly,
-        priceYearly,
-        requestsPerMonth: plan.requestsPerMonth,
-        requestsPerSecond: plan.requestsPerSecond,
-        burstRequestsPerSecond: plan.burstRequestsPerSecond,
+        return this.usagePlanRepository.create({
+          id: plan.id,
+          name: plan.name,
+          description: plan.description,
+          stripeLookupKeyMonthly: plan.name.toLowerCase(),
+          stripeLookupKeyYearly: `${plan.name.toLowerCase()}-yearly`,
+          priceMonthly,
+          priceYearly,
+          requestsPerMonth: plan.requestsPerMonth,
+          requestsPerSecond: plan.requestsPerSecond,
+          burstRequestsPerSecond: plan.burstRequestsPerSecond,
+        });
       });
-    });
 
     // Save the fetched usage plans to the database
     await this.usagePlanRepository.save(usagePlans);
 
     // Return the saved usage plans mapped to DTOs
-    return usagePlans.map(plan => ({
+    return usagePlans.map((plan) => ({
       name: plan.name,
       description: plan.description,
-      stripeProductId: plan.stripeProductId,
+      stripeLookupKeyMonthly: plan.name.toLowerCase(),
+      stripeLookupKeyYearly: `${plan.name.toLowerCase()}-yearly`,
       priceMonthly: plan.priceMonthly,
       priceYearly: plan.priceYearly,
       requestsPerMonth: plan.requestsPerMonth,

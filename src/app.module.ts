@@ -29,7 +29,7 @@ import { UsagePlan } from './usage-plans/entities/usage-plan.entity';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, UsagePlan]),
     ThrottlerModule.forRoot([
       {
         ttl: 1000,
