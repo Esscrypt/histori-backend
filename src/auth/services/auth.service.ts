@@ -180,7 +180,8 @@ export class AuthService {
 
     await this.mailService.sendUserConfirmation(email, confirmationToken);
     return { message: 'Confirmation email has been sent' };
-  }п
+  }
+  п;
 
   // Find a user by email or userId
   private async findUserByEmail(email: string, userId?: number): Promise<User> {
@@ -383,7 +384,6 @@ export class AuthService {
   }
 
   async getUserProfile(userId: number): Promise<any> {
-
     const user = await this.userRepository.findOne({
       where: { id: userId },
       select: [
@@ -402,23 +402,28 @@ export class AuthService {
     }
 
     const currentDate = new Date();
-    const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    const startDate = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1,
+    )
       .toISOString()
       .split('T')[0]; // Format: YYYY-MM-DD
     const endDate = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
 
     // Fetch the current request count from AWS
     try {
-      const currentRequestCount = await this.awsService.getRequestCountForApiKey(
-        user,
-        startDate,
-        endDate,
-      );
+      const currentRequestCount =
+        await this.awsService.getRequestCountForApiKey(
+          user,
+          startDate,
+          endDate,
+        );
       user.requestCount = currentRequestCount; // Update the requestCount from AWS
     } catch (error) {
       throw new Error(`Failed to get request count for user: ${error.message}`);
     }
-    
+
     return user;
   }
 
