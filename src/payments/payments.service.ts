@@ -64,14 +64,16 @@ export class PaymentsService {
         }
       }
 
-      if (!user.apiKey) {
-        user.apiKey = await this.awsService.createAwsApiGatewayKey(user);
+      if (!user.apiKeyId) {
+        const apiKey = await this.awsService.createAwsApiGatewayKey();
+        user.apiKeyId = apiKey.id;
+        user.apiKeyValue = apiKey.value;
         this.logger.log(`Created new API key for user: ${user.id}`);
       }
 
       if (user.tier !== newTier) {
         await this.awsService.associateKeyWithUsagePlan(
-          user.apiKey,
+          user.apiKeyId,
           user.tier,
           newTier,
         );
@@ -116,10 +118,11 @@ export class PaymentsService {
       const deletedSubscriptionId = oldSubscription.id as string;
       console.log('Subscription deleted:', deletedSubscriptionId);
       console.log('Current subscription:', user.subscriptionId);
-      if (user.subscriptionId === deletedSubscriptionId && user.apiKey) {
+      if (user.subscriptionId === deletedSubscriptionId && user.apiKeyId) {
         // Deletion is due to user termination, not cancellation (upgrade)
-        await this.awsService.removeApiKey(user.apiKey);
-        user.apiKey = null;
+        await this.awsService.removeApiKey(user.apiKeyId);
+        user.apiKeyId = null;
+        user.apiKeyValue = null;
         await this.userRepository.save(user);
         console.log('User terminated subscription');
       }

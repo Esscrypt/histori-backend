@@ -36,6 +36,19 @@ export class AuthService {
     private readonly awsService: AWSService,
   ) {}
 
+  async removeApiKey(user: User) {
+    if (user.apiKeyId) {
+      try {
+        await this.awsService.removeApiKey(user.apiKeyId);
+        console.log(`API key ${user.apiKeyId} deleted from AWS.`);
+      } catch (error) {
+        throw new Error(
+          `Failed to delete API key ${user.apiKeyId}: ${error.message}`,
+        );
+      }
+    }
+  }
+
   // Reusable method for creating a new user
   private async createNewUser(
     email: string,
@@ -53,14 +66,15 @@ export class AuthService {
       isActive: true,
     });
 
-    const newUser = await this.userRepository.save(user);
+    const apiKey = await this.awsService.createAwsApiGatewayKey();
+    this.logger.log(`API key created:`, JSON.stringify(apiKey));
+    user.apiKeyId = apiKey.id;
+    user.apiKeyValue = apiKey.value;
+    user.tier = 'Free'; // Default tier for new users
+    // Associate the API key with a usage plan
+    await this.awsService.associateKeyWithUsagePlan(apiKey.id, 'Free', 'Free');
 
-    const apiKey = await this.awsService.createAwsApiGatewayKey(newUser);
-    newUser.apiKey = apiKey;
-    newUser.tier = 'Free'; // Default tier for new users
-    await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
-
-    return await this.userRepository.save(newUser);
+    return await this.userRepository.save(user);
   }
 
   // Reusable method for generating access and refresh tokens
@@ -154,13 +168,14 @@ export class AuthService {
       stripeCustomerId,
     });
 
-    const newUser = await this.userRepository.save(user);
+    const apiKey = await this.awsService.createAwsApiGatewayKey();
+    user.apiKeyId = apiKey.id;
+    user.apiKeyValue = apiKey.value;
+    user.tier = 'Free'; // Default tier for new users
+    // Associate the API key with a usage plan
+    await this.awsService.associateKeyWithUsagePlan(apiKey.id, 'Free', 'Free');
 
-    const apiKey = await this.awsService.createAwsApiGatewayKey(newUser);
-    newUser.apiKey = apiKey;
-    newUser.tier = 'Free'; // Default tier for new users
-    await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
-    await this.userRepository.save(newUser);
+    const newUser = await this.userRepository.save(user);
 
     return await this.sendConfirmation(email, newUser.id);
   }
@@ -267,13 +282,18 @@ export class AuthService {
         referrerCode: referrer,
       });
 
-      const newUser = await this.userRepository.save(user);
+      const apiKey = await this.awsService.createAwsApiGatewayKey();
+      user.apiKeyId = apiKey.id;
+      user.apiKeyValue = apiKey.value;
+      user.tier = 'Free'; // Default tier for new users
+      // Associate the API key with a usage plan
+      await this.awsService.associateKeyWithUsagePlan(
+        apiKey.id,
+        'Free',
+        'Free',
+      );
 
-      const apiKey = await this.awsService.createAwsApiGatewayKey(user);
-      newUser.apiKey = apiKey;
-      newUser.tier = 'Free'; // Default tier for new users
-      await this.awsService.associateKeyWithUsagePlan(apiKey, 'Free', 'Free');
-      await this.userRepository.save(newUser);
+      await this.userRepository.save(user);
     }
 
     return this.generateTokens(user);
@@ -388,9 +408,9 @@ export class AuthService {
       where: { id: userId },
       select: [
         'email',
-        'apiKey',
+        'apiKeyValue',
+        'apiKeyId',
         'tier',
-        'requestCount',
         'requestLimit',
         'referralCode',
         'referralPoints',
@@ -476,6 +496,7 @@ export class AuthService {
         throw new NotFoundException('User not found');
       }
 
+      await this.removeApiKey(user);
       await this.userRepository.remove(user);
 
       return { message: 'User account has been deleted successfully.' };

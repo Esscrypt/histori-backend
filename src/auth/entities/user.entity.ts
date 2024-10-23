@@ -7,7 +7,6 @@ import {
   AfterLoad,
   CreateDateColumn,
   Index,
-  BeforeRemove,
 } from 'typeorm';
 import * as bcrypt from 'bcryptjs'; // or 'bcryptjs'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -20,9 +19,6 @@ import {
   MinLength,
 } from 'class-validator';
 import { v4 as uuidv4 } from 'uuid';
-
-import { Inject } from '@nestjs/common';
-import { AWSService } from 'src/awsservice/awsservice.service';
 
 @Entity('user')
 export class User {
@@ -57,8 +53,12 @@ export class User {
 
   @Index() // Add index to the apiKey for faster lookup
   @Column({ nullable: true })
-  @ApiProperty({ description: 'API key for the user to access APIs' })
-  apiKey?: string;
+  @ApiProperty({ description: 'API key id for the user to access APIs' })
+  apiKeyId: string;
+
+  @Column({ nullable: true })
+  @ApiProperty({ description: 'API key id for the user to access APIs' })
+  apiKeyValue: string;
 
   @Column({
     type: 'enum',
@@ -121,9 +121,6 @@ export class User {
   })
   subscriptionId?: string; // Store the current active subscription ID
 
-  @Column({ nullable: true })
-  lastIdempotencyKey?: string;
-
   private tempPassword: string;
 
   @AfterLoad()
@@ -147,28 +144,5 @@ export class User {
 
   async comparePassword(enteredPassword: string): Promise<boolean> {
     return await bcrypt.compare(enteredPassword, this.password);
-  }
-
-  async compareApiKey(providedApiKey: string): Promise<boolean> {
-    return this.apiKey === providedApiKey;
-  }
-
-  constructor(
-    @Inject(AWSService) private readonly awsService: AWSService, // Inject AWSService
-  ) {}
-
-  // Before deleting the user, remove the API key using the AWS service
-  @BeforeRemove()
-  async removeApiKey() {
-    if (this.apiKey) {
-      try {
-        await this.awsService.removeApiKey(this.apiKey);
-        console.log(`API key ${this.apiKey} deleted from AWS.`);
-      } catch (error) {
-        throw new Error(
-          `Failed to delete API key ${this.apiKey}: ${error.message}`,
-        );
-      }
-    }
   }
 }
