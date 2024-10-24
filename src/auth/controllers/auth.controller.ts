@@ -10,6 +10,7 @@ import {
   Req,
   BadRequestException,
   Delete,
+  Inject,
 } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 
@@ -31,12 +32,17 @@ import { ContactDto } from '../dto/contact.dto';
 import { MailService } from '../services/mail.service';
 import { Web3LoginDto } from '../dto/web3-login.dto';
 import { MailChangeDto } from '../dto/mail-chage.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { User } from '../entities/user.entity';
+import { Repository } from 'typeorm';
 
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name); // Set up logger for controller
 
   constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly authService: AuthService,
     private readonly oAuthService: OAuthService,
     private readonly mailService: MailService,
@@ -128,10 +134,16 @@ export class AuthController {
     description: 'Invalid email or user not found.',
   })
   async updateEmail(@Body() mailChangeDto: MailChangeDto, @Req() req) {
+    const user = await this.userRepository.findOne({
+      where: { email: mailChangeDto.email },
+    });
+    if (user) {
+      throw new BadRequestException('Email already in use');
+    }
+
     this.logger.log(`Updating confirmation email for: ${mailChangeDto.email}`);
     return this.authService.sendConfirmation(mailChangeDto.email, req.user.id);
   }
-
 
   @Post('resend-confirmation')
   @ApiOperation({ summary: 'Resend email confirmation link' })
@@ -143,6 +155,12 @@ export class AuthController {
     description: 'Invalid email or user not found.',
   })
   async resendConfirmation(@Body('email') email: string) {
+    const user = await this.userRepository.findOne({
+      where: { email: email },
+    });
+    if (user) {
+      throw new BadRequestException('Email already in use');
+    }
     this.logger.log(`Resending confirmation email for: ${email}`);
     return this.authService.sendConfirmation(email);
   }

@@ -40,9 +40,9 @@ export class PaymentsController {
   ) {
     try {
       const { lookup_key } = createCheckoutSessionDto;
-      console.log('User Info:', req.user); // Log user to verify structure
+      // console.log('User Info:', req.user); // Log user to verify structure
       const userId = req.user.userId as number;
-      this.logger.log('userId', userId);
+      // this.logger.log('userId', userId);
       const sessionUrl = await this.paymentsService.createCheckoutSession(
         lookup_key,
         userId,

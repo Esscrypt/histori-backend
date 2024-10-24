@@ -7,7 +7,6 @@ import { User } from './entities/user.entity';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { MailService } from './services/mail.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { RequestResetService } from './services/request-reset.service';
 import { PaymentsService } from 'src/payments/payments.service';
 import { StripeModule } from '@golevelup/nestjs-stripe';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
@@ -68,7 +67,6 @@ import { UsagePlan } from 'src/usage-plans/entities/usage-plan.entity';
     OAuthService,
     MailService,
     JwtService,
-    RequestResetService,
     PaymentsService,
     AWSService,
   ],
