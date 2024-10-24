@@ -12,6 +12,8 @@ import { JwtService } from '@nestjs/jwt';
 import { AWSService } from './awsservice/awsservice.service';
 import { UsagePlansModule } from './usage-plans/usage-plans.module';
 import { UsagePlan } from './usage-plans/entities/usage-plan.entity';
+import { ApiRequesterService } from './api-requester/api-requester.service';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -49,10 +51,18 @@ import { UsagePlan } from './usage-plans/entities/usage-plan.entity';
       }),
       inject: [ConfigService],
     }),
+    ScheduleModule.forRoot(),
     AuthModule,
     UsagePlansModule,
   ],
-  providers: [Logger, PaymentsService, MailService, JwtService, AWSService],
+  providers: [
+    Logger,
+    PaymentsService,
+    MailService,
+    JwtService,
+    AWSService,
+    ApiRequesterService,
+  ],
   controllers: [PaymentsController],
 })
 export class AppModule {}

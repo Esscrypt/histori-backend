@@ -244,6 +244,20 @@ export class AWSService {
     }
   }
 
+  async removeApiKeyTierAssociation(
+    apiKeyId: string,
+    tier: string,
+  ): Promise<void> {
+    const usagePlan: UsagePlan = await this.usagePlanRepository.findOne({
+      where: { name: tier },
+    });
+    if (!usagePlan) {
+      this.logger.error(`No usage plan found for user tier: ${tier}`);
+      throw new Error('No usage plan found for user tier');
+    }
+    await this.removeApiKeyPlanAssociation(apiKeyId, usagePlan.id);
+  }
+
   async removeApiKeyPlanAssociation(
     apiKeyId: string,
     usagePlanId: string,
@@ -262,11 +276,6 @@ export class AWSService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       this.logger.log('Already disassociated with the usage plan');
-      // this.logger.error(
-      //   `Failed to remove API Key ${apiKeyId} from Usage Plan ${usagePlanId}`,
-      //   error.message,
-      // );
-      //throw new Error('Failed to remove API Key from existing usage plan');
     }
   }
 

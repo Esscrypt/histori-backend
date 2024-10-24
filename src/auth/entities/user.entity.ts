@@ -62,17 +62,17 @@ export class User {
 
   @Column({
     type: 'enum',
-    enum: ['Free', 'Starter', 'Growth', 'Business', 'Enterprise'],
+    enum: ['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'],
     default: 'Free',
   })
   @ApiProperty({
     description: 'API tier assigned to the user',
-    enum: ['Free', 'Starter', 'Growth', 'Business', 'Enterprise'],
+    enum: ['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'],
     default: 'Free',
   })
-  @IsEnum(['Free', 'Starter', 'Growth', 'Business', 'Enterprise'], {
+  @IsEnum(['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'], {
     message:
-      'Tier must be one of the following: Free, Starter, Growth, Business, Enterprise',
+      'Tier must be one of the following: Free, Starter, Growth, Business, Enterprise, None',
   })
   tier: string;
 
@@ -92,12 +92,6 @@ export class User {
   @IsOptional()
   @IsEthereumAddress({ message: 'Invalid Ethereum wallet address' })
   web3Address?: string;
-
-  @Column({ default: 'us-east-1' })
-  @ApiPropertyOptional({
-    description: 'Instance location for the API server',
-  })
-  instanceLocation: string;
 
   @Column({ unique: true })
   @ApiProperty({ description: 'Referral code for the user to refer others' })

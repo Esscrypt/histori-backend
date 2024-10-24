@@ -26,8 +26,12 @@ export class TrialMonitorService {
 
       // If account is 21 days old and still on Free tier, set request limit to 0
       if (user.tier === 'Free' && accountAge >= 21) {
-        await this.awsService.removeApiKey(user.apiKeyId);
-        user.apiKeyId = null;
+        await this.awsService.removeApiKeyTierAssociation(
+          user.apiKeyId,
+          user.tier,
+        );
+        user.tier = 'None';
+        user.requestLimit = 0;
         await this.userRepository.save(user);
         console.log(
           `User ${user.email} has been downgraded to request limit 0 due to trial expiration.`,

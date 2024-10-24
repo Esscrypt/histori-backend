@@ -10,7 +10,6 @@ import {
   Req,
   BadRequestException,
   Delete,
-  Inject,
 } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 
@@ -123,7 +122,7 @@ export class AuthController {
     return this.authService.register(createUserDto);
   }
 
-  @Post('create-email')
+  @Post('update-email')
   @UseGuards(TokenAuthGuard)
   @ApiOperation({ summary: 'Set user email' })
   @ApiResponse({
@@ -155,12 +154,6 @@ export class AuthController {
     description: 'Invalid email or user not found.',
   })
   async resendConfirmation(@Body('email') email: string) {
-    const user = await this.userRepository.findOne({
-      where: { email: email },
-    });
-    if (user) {
-      throw new BadRequestException('Email already in use');
-    }
     this.logger.log(`Resending confirmation email for: ${email}`);
     return this.authService.sendConfirmation(email);
   }
