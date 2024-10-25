@@ -141,6 +141,7 @@ export class PaymentsService {
         );
         user.tier = 'None';
         user.requestLimit = 0;
+        user.requestCount = 0;
         await this.userRepository.save(user);
         console.log(`Removed API key for user: ${user.id}`);
       }
@@ -287,5 +288,13 @@ export class PaymentsService {
   public async createStripeCustomer(email?: string): Promise<string> {
     const customer = await this.stripeClient.customers.create({ email });
     return customer.id;
+  }
+
+  async deleteCustomer(stripeCustomerId: string): Promise<void> {
+    try {
+      await this.stripeClient.customers.del(stripeCustomerId);
+    } catch (error: any) {
+      this.logger.error(`Error deleting customer: ${error.message}`);
+    }
   }
 }

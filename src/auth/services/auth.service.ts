@@ -412,6 +412,7 @@ export class AuthService {
         'apiKeyId',
         'tier',
         'requestLimit',
+        'requestCount',
         'referralCode',
         'referralPoints',
       ],
@@ -421,27 +422,22 @@ export class AuthService {
       throw new Error(`User with ID ${userId} not found`);
     }
 
-    const currentDate = new Date();
-    const startDate = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      1,
-    )
-      .toISOString()
-      .split('T')[0]; // Format: YYYY-MM-DD
-    const endDate = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-
-    // Fetch the current request count from AWS
-    try {
-      const currentRequestCount =
-        await this.awsService.getRequestCountForApiKey(
-          user,
-          startDate,
-          endDate,
-        );
-      user.requestCount = currentRequestCount; // Update the requestCount from AWS
-    } catch (error) {
-      throw new Error(`Failed to get request count for user: ${error.message}`);
+    if (user.tier !== 'None') {
+      const currentDate = new Date();
+      const startDate = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      )
+        .toISOString()
+        .split('T')[0]; // Format: YYYY-MM-DD
+      const endDate = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      // Fetch the current request count from AWS
+      user.requestCount = await this.awsService.getRequestCountForApiKey(
+        user,
+        startDate,
+        endDate,
+      );
     }
 
     return user;
@@ -495,6 +491,8 @@ export class AuthService {
       if (!user) {
         throw new NotFoundException('User not found');
       }
+
+      await this.paymentService.deleteCustomer(user.stripeCustomerId);
 
       await this.removeApiKey(user);
       await this.userRepository.remove(user);

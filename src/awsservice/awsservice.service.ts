@@ -142,6 +142,7 @@ export class AWSService {
         `Failed to get request count for API Key: ${user.apiKeyId}`,
         error.message,
       );
+      return 0;
       // throw new Error('Failed to get request count for API key');
     }
   }
@@ -198,7 +199,7 @@ export class AWSService {
     previousTier: string,
     currentTier: string,
   ): Promise<void> {
-    if (previousTier !== currentTier) {
+    if (previousTier !== currentTier && previousTier !== 'None') {
       const previousUsagePlan: UsagePlan =
         await this.usagePlanRepository.findOne({
           where: { name: previousTier },
