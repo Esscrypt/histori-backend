@@ -10,6 +10,7 @@ import { User } from 'src/auth/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from 'src/auth/services/mail.service';
 import { AWSService } from 'src/awsservice/awsservice.service';
+import e from 'express';
 
 @Injectable()
 export class PaymentsService {
@@ -43,27 +44,54 @@ export class PaymentsService {
     const newTier = this.getTierFromProductId(productId);
 
     try {
-      await this.awsService.associateKeyWithUsagePlan(
-        user.apiKeyId,
-        user.tier,
-        newTier,
-      );
+      if (this.isRPCTier(newTier)) {
+        await this.awsService.associateKeyWithUsagePlan(
+          user.apiKeyId,
+          user.rpcTier,
+          newTier,
+        );
 
-      const oldTier = user.tier;
+        const oldTier = user.rpcTier;
 
-      user.tier = newTier;
+        user.rpcTier = newTier;
 
-      user.requestLimit =
-        await this.awsService.getTotalRequestCountForUsagePlan(user);
-      this.logger.log('new request limit:', user.requestLimit);
+        user.rpcRequestLimit =
+          await this.awsService.getTotalRequestCountForUsagePlan(newTier);
+        this.logger.log(
+          'New RPC Multinode Request limit:',
+          user.rpcRequestLimit,
+        );
 
-      await this.userRepository.save(user);
+        await this.userRepository.save(user);
 
-      await this.handleReferralBonus(user, newSubscription);
+        await this.handleReferralBonus(user, newSubscription);
 
-      this.logger.log(
-        `Updated usage plan for user: ${user.id} from ${oldTier} to ${newTier}`,
-      );
+        this.logger.log(
+          `Updated usage plan for user: ${user.id} from ${oldTier} to ${newTier}`,
+        );
+      } else {
+        await this.awsService.associateKeyWithUsagePlan(
+          user.apiKeyId,
+          user.tier,
+          newTier,
+        );
+
+        const oldTier = user.tier;
+
+        user.tier = newTier;
+
+        user.requestLimit =
+          await this.awsService.getTotalRequestCountForUsagePlan(newTier);
+        this.logger.log('new request limit:', user.requestLimit);
+
+        await this.userRepository.save(user);
+
+        await this.handleReferralBonus(user, newSubscription);
+
+        this.logger.log(
+          `Updated usage plan for user: ${user.id} from ${oldTier} to ${newTier}`,
+        );
+      }
     } catch (error) {
       this.logger.error(
         `Failed to update usage plan for user: ${user.id}`,
@@ -89,25 +117,50 @@ export class PaymentsService {
     const newTier = this.getTierFromProductId(productId);
 
     try {
-      await this.awsService.associateKeyWithUsagePlan(
-        user.apiKeyId,
-        user.tier,
-        newTier,
-      );
+      if (this.isRPCTier(newTier)) {
+        await this.awsService.associateKeyWithUsagePlan(
+          user.apiKeyId,
+          user.rpcTier,
+          newTier,
+        );
 
-      const oldTier = user.tier;
+        const oldTier = user.rpcTier;
 
-      user.tier = newTier;
+        user.rpcTier = newTier;
 
-      user.requestLimit =
-        await this.awsService.getTotalRequestCountForUsagePlan(user);
-      this.logger.log('new request limit:', user.requestLimit);
+        user.rpcRequestLimit =
+          await this.awsService.getTotalRequestCountForUsagePlan(newTier);
+        this.logger.log(
+          'New RPC Multinode Request limit:',
+          user.rpcRequestLimit,
+        );
 
-      await this.userRepository.save(user);
+        await this.userRepository.save(user);
 
-      this.logger.log(
-        `Updated usage plan for user: ${user.id} from ${oldTier} to ${newTier}`,
-      );
+        this.logger.log(
+          `Updated usage plan for user: ${user.id} from ${oldTier} to ${newTier}`,
+        );
+      } else {
+        await this.awsService.associateKeyWithUsagePlan(
+          user.apiKeyId,
+          user.tier,
+          newTier,
+        );
+
+        const oldTier = user.tier;
+
+        user.tier = newTier;
+
+        user.requestLimit =
+          await this.awsService.getTotalRequestCountForUsagePlan(newTier);
+        this.logger.log('new request limit:', user.requestLimit);
+
+        await this.userRepository.save(user);
+
+        this.logger.log(
+          `Updated usage plan for user: ${user.id} from ${oldTier} to ${newTier}`,
+        );
+      }
     } catch (error) {
       this.logger.error(
         `Failed to update usage plan for user: ${user.id}`,
@@ -131,19 +184,31 @@ export class PaymentsService {
       return;
     }
 
+    const productId = subscription.items.data[0].price.product as string;
+    const deletedTier = this.getTierFromProductId(productId);
+
     // Handle the deletion (remove API keys, etc.)
     try {
       if (user.apiKeyId) {
-        // Associate the API key with the Null tier
-        await this.awsService.removeApiKeyTierAssociation(
-          user.apiKeyId,
-          user.tier,
-        );
-        user.tier = 'None';
-        user.requestLimit = 0;
-        user.requestCount = 0;
-        await this.userRepository.save(user);
-        console.log(`Removed API key for user: ${user.id}`);
+        if (this.isRPCTier(deletedTier)) {
+          await this.awsService.removeApiKeyTierAssociation(
+            user.apiKeyId,
+            user.rpcTier,
+          );
+          user.rpcTier = 'None';
+          user.rpcRequestLimit = 0;
+          await this.userRepository.save(user);
+          console.log(`Removed API key for user: ${user.id}`);
+        } else {
+          await this.awsService.removeApiKeyTierAssociation(
+            user.apiKeyId,
+            user.tier,
+          );
+          user.tier = 'None';
+          user.requestLimit = 0;
+          await this.userRepository.save(user);
+          console.log(`Removed API key for user: ${user.id}`);
+        }
       }
     } catch (error: any) {
       this.logger.error(
@@ -194,8 +259,15 @@ export class PaymentsService {
       prod_Qm8v7qrPXe57FY: 'Starter',
       prod_Qs8muZH1YGmilO: 'Growth',
       prod_Qs8nm4g18RXJmY: 'Business',
+      prod_R7DyVrhJf9ODdd: 'Starter Archival MultiNode',
+      prod_R7E0BTnFT7bEQ9: 'Growth Archival MultiNode',
+      prod_R7E35yolSE6Eio: 'Business Archival MultiNode',
     };
     return tierMap[productId] || 'Free';
+  }
+
+  private isRPCTier(tier: string): boolean {
+    return tier.includes('MultiNode');
   }
 
   // Create a checkout session with Stripe
@@ -286,7 +358,12 @@ export class PaymentsService {
 
   // Create a Stripe customer and return their ID
   public async createStripeCustomer(email?: string): Promise<string> {
-    const customer = await this.stripeClient.customers.create({ email });
+    let customer: Stripe.Customer;
+    if (email) {
+      customer = await this.stripeClient.customers.create({ email });
+    } else {
+      customer = await this.stripeClient.customers.create();
+    }
     return customer.id;
   }
 

@@ -14,6 +14,11 @@ import { UsagePlansModule } from './usage-plans/usage-plans.module';
 import { UsagePlan } from './usage-plans/entities/usage-plan.entity';
 import { ApiRequesterService } from './api-requester/api-requester.service';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BlockchainService } from './blockchain/blockchain.service';
+import { BlockchainController } from './blockchain/blockchain.controller';
+import { AuthService } from './auth/services/auth.service';
+import { OAuthService } from './auth/services/oauth.service';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -54,15 +59,20 @@ import { ScheduleModule } from '@nestjs/schedule';
     ScheduleModule.forRoot(),
     AuthModule,
     UsagePlansModule,
+    HttpModule,
   ],
   providers: [
     Logger,
     PaymentsService,
     MailService,
     JwtService,
+    OAuthService,
     AWSService,
+    AuthService,
     ApiRequesterService,
+    BlockchainService,
   ],
-  controllers: [PaymentsController],
+  exports: [AuthService, BlockchainService],
+  controllers: [PaymentsController, BlockchainController],
 })
 export class AppModule {}

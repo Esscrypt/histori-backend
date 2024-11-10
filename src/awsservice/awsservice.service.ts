@@ -106,14 +106,15 @@ export class AWSService {
   // Helper to get request count for a specific API key
   async getRequestCountForApiKey(
     user: User,
+    tier: string,
     startDate: string,
     endDate: string,
   ): Promise<number> {
     const usagePlan: UsagePlan = await this.usagePlanRepository.findOne({
-      where: { name: user.tier },
+      where: { name: tier },
     });
     if (!usagePlan) {
-      this.logger.error(`No usage plan found for user tier: ${user.tier}`);
+      this.logger.error(`No usage plan found for user tier: ${tier}`);
       throw new Error('No usage plan found for user tier');
     }
 
@@ -131,9 +132,9 @@ export class AWSService {
 
       // this.logger.debug(`Usage data for API Key: ${user.apiKeyId}`, usageData);
       if (usageData.items[user.apiKeyId] === undefined) {
-        this.logger.warn(
-          `API Key still has not made any requests: ${user.apiKeyId}`,
-        );
+        // this.logger.warn(
+        //   `API Key still has not made any requests: ${user.apiKeyId}`,
+        // );
         return 0;
       }
       return this.sumRequestCounts(usageData.items[user.apiKeyId]);
@@ -157,12 +158,12 @@ export class AWSService {
   }
 
   // Helper to get the total request count for a usage plan
-  async getTotalRequestCountForUsagePlan(user: User): Promise<number> {
+  async getTotalRequestCountForUsagePlan(tier: string): Promise<number> {
     const usagePlan: UsagePlan = await this.usagePlanRepository.findOne({
-      where: { name: user.tier },
+      where: { name: tier },
     });
     if (!usagePlan) {
-      this.logger.error(`No usage plan found for user tier: ${user.tier}`);
+      this.logger.error(`No usage plan found for user tier: ${tier}`);
       throw new Error('No usage plan found for user tier');
     }
 

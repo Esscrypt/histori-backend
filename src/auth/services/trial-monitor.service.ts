@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from 'src/auth/entities/user.entity';
-import * as moment from 'moment';
+import moment from 'moment';
 import { MailService } from './mail.service';
 import { AWSService } from 'src/awsservice/awsservice.service';
 

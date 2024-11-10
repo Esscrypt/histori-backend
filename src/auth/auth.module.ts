@@ -15,6 +15,7 @@ import { OAuthService } from './services/oauth.service';
 import { HttpModule } from '@nestjs/axios';
 import { AWSService } from 'src/awsservice/awsservice.service';
 import { UsagePlan } from 'src/usage-plans/entities/usage-plan.entity';
+import { BlockchainService } from 'src/blockchain/blockchain.service';
 
 @Module({
   imports: [
@@ -63,6 +64,15 @@ import { UsagePlan } from 'src/usage-plans/entities/usage-plan.entity';
   ],
   controllers: [AuthController],
   providers: [
+    AuthService,
+    OAuthService,
+    MailService,
+    JwtService,
+    PaymentsService,
+    AWSService,
+    BlockchainService,
+  ],
+  exports: [
     AuthService,
     OAuthService,
     MailService,

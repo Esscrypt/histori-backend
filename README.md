@@ -11,6 +11,12 @@
 4. Check the Enable host networking option.
 5. Select Apply and restart.
 
+
+## Usage
+> Ensure no other postgresql process is started, only the one in docker at port 5432
+> Fill up the usage plans (needed for the api key association on register) by calling `GET http://localhost:4242/usage-plans`
+> Run the frontend repo using `npx serve@latest out`
+
 ## Environment variables
 Copy the example files and fill in the values
 ```bash

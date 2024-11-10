@@ -20,6 +20,10 @@ import { OAuthService } from './oauth.service';
 import { HttpService } from '@nestjs/axios';
 import { ethers } from 'ethers';
 import { AWSService } from 'src/awsservice/awsservice.service';
+import { BlockchainService } from 'src/blockchain/blockchain.service';
+import { v4 as uuidv4 } from 'uuid';
+
+import bn from 'bignumber.js'; // Importing bignumber.js for precision control
 
 @Injectable()
 export class AuthService {
@@ -34,7 +38,12 @@ export class AuthService {
     private readonly oAuthService: OAuthService,
     private readonly httpService: HttpService,
     private readonly awsService: AWSService,
+    private readonly blockchainService: BlockchainService,
   ) {}
+
+  private generateRandomString(): string {
+    return uuidv4().replace(/-/g, '').substring(0, 8); // Remove hyphens and get the first 8 characters
+  }
 
   async removeApiKey(user: User) {
     if (user.apiKeyId) {
@@ -50,29 +59,45 @@ export class AuthService {
   }
 
   // Reusable method for creating a new user
-  private async createNewUser(
-    email: string,
-    githubId?: string,
-    referrerCode?: string,
-  ): Promise<User> {
+  public async createNewUser(options: {
+    web3Address?: string;
+    email?: string;
+    password?: string;
+    isActive?: boolean;
+    githubId?: string;
+    referrerCode?: string;
+  }): Promise<User> {
+    const { web3Address, email, password, isActive, githubId, referrerCode } =
+      options;
     const stripeCustomerId =
       await this.paymentService.createStripeCustomer(email);
 
     const user = this.userRepository.create({
       email,
+      password,
+      isActive: isActive === undefined ? true : isActive,
       githubId,
+      web3Address,
       stripeCustomerId,
       referrerCode,
-      isActive: true,
     });
 
     const apiKey = await this.awsService.createAwsApiGatewayKey();
     this.logger.log(`API key created:`, JSON.stringify(apiKey));
     user.apiKeyId = apiKey.id;
     user.apiKeyValue = apiKey.value;
+    const prefix = this.generateRandomString();
+    const suffix = this.generateRandomString();
+    user.projectId = `${prefix}${apiKey.id}${suffix}`;
     user.tier = 'Free'; // Default tier for new users
+    user.rpcTier = 'Free Archival MultiNode'; // Default tier for new users
     // Associate the API key with a usage plan
     await this.awsService.associateKeyWithUsagePlan(apiKey.id, 'Free', 'Free');
+    await this.awsService.associateKeyWithUsagePlan(
+      apiKey.id,
+      'Free Archival MultiNode',
+      'Free Archival MultiNode',
+    );
 
     return await this.userRepository.save(user);
   }
@@ -118,11 +143,11 @@ export class AuthService {
     }
 
     if (!existingUser) {
-      existingUser = await this.createNewUser(
-        userInfo.email,
+      existingUser = await this.createNewUser({
+        email: userInfo.email,
         githubId,
-        referrer,
-      );
+        referrerCode: referrer,
+      });
     }
 
     return existingUser;
@@ -157,25 +182,12 @@ export class AuthService {
 
     if (existingUser) throw new BadRequestException('User already exists');
 
-    const stripeCustomerId =
-      await this.paymentService.createStripeCustomer(email);
-
-    const user = this.userRepository.create({
+    const newUser = await this.createNewUser({
       email,
       password,
       isActive: false,
       referrerCode: referrer,
-      stripeCustomerId,
     });
-
-    const apiKey = await this.awsService.createAwsApiGatewayKey();
-    user.apiKeyId = apiKey.id;
-    user.apiKeyValue = apiKey.value;
-    user.tier = 'Free'; // Default tier for new users
-    // Associate the API key with a usage plan
-    await this.awsService.associateKeyWithUsagePlan(apiKey.id, 'Free', 'Free');
-
-    const newUser = await this.userRepository.save(user);
 
     return await this.sendConfirmation(email, newUser.id);
   }
@@ -183,7 +195,6 @@ export class AuthService {
   // Send confirmation email
   async sendConfirmation(email: string, userId?: number) {
     const user = await this.findUserByEmail(email, userId);
-    //if (user.isActive) throw new BadRequestException('User is already active');
 
     const confirmationToken = this.jwtService.sign(
       { userId: user.id, email: email },
@@ -223,9 +234,12 @@ export class AuthService {
     if (!user) throw new BadRequestException('Invalid token');
     if (!user.email) {
       user.email = decoded.email;
+      await this.userRepository.save(user);
     }
-    user.isActive = true;
-    await this.userRepository.save(user);
+    if (!user.isActive) {
+      user.isActive = true;
+      await this.userRepository.save(user);
+    }
 
     return this.generateTokens(user);
   }
@@ -240,7 +254,7 @@ export class AuthService {
     if (!user) throw new BadRequestException('Invalid credentials');
     if (!user.password) {
       throw new BadRequestException(
-        'User has no password. Maybe you signed up with Google or GitHub?',
+        'User has no password. Maybe you signed up with Google, GitHub or Web3?',
       );
     }
 
@@ -272,28 +286,10 @@ export class AuthService {
     });
 
     if (!user) {
-      const stripeCustomerId = await this.paymentService.createStripeCustomer();
-      // Optionally, you can validate the wallet address further if necessary
-      user = this.userRepository.create({
+      user = await this.createNewUser({
         web3Address: walletAddress,
-        isActive: true, // Assuming new wallet-based users are active by default
-        email: '', // Since it's a wallet-based login, you may not have an email
-        stripeCustomerId, // stripeCustomerId,
         referrerCode: referrer,
       });
-
-      const apiKey = await this.awsService.createAwsApiGatewayKey();
-      user.apiKeyId = apiKey.id;
-      user.apiKeyValue = apiKey.value;
-      user.tier = 'Free'; // Default tier for new users
-      // Associate the API key with a usage plan
-      await this.awsService.associateKeyWithUsagePlan(
-        apiKey.id,
-        'Free',
-        'Free',
-      );
-
-      await this.userRepository.save(user);
     }
 
     return this.generateTokens(user);
@@ -404,22 +400,50 @@ export class AuthService {
   }
 
   async getUserProfile(userId: number): Promise<any> {
-    const user = await this.userRepository.findOne({
+    const user: any = await this.userRepository.findOne({
       where: { id: userId },
       select: [
         'email',
         'apiKeyValue',
-        'apiKeyId',
+        'projectId',
         'tier',
+        'rpcTier',
+        'planEndDate',
+        'rpcPlanEndDate',
         'requestLimit',
         'requestCount',
+        'rpcRequestCount',
+        'rpcRequestLimit',
         'referralCode',
         'referralPoints',
+        'web3Address',
       ],
     });
 
     if (!user) {
       throw new Error(`User with ID ${userId} not found`);
+    }
+
+    //TODO: Fetch HST balance and price from blockchain service
+    let currentBalanceInWei: string | undefined;
+    let currentHstPriceInUSD: bn | undefined;
+    // const currentBalanceInWei: string | undefined =
+    //   await this.blockchainService.fetchHstBalance(user.web3Address);
+    // const currentHstPriceInUSD: bn | undefined =
+    //   await this.blockchainService.fetchCurrentHSTPriceInUSD();
+
+    if (currentBalanceInWei && currentHstPriceInUSD) {
+      user.hstBalance = currentBalanceInWei;
+      if (process.env.NODE_ENV === 'development') {
+        user.hstToUSD = 0.5; // mock value for development
+      } else {
+        user.hstToUSD = currentHstPriceInUSD;
+      }
+      user.totalBalanceInUSD = `$${new bn(user.hstBalance).multipliedBy(user.hstToUSD).toString()}`;
+    } else {
+      user.hstBalance = '0';
+      user.hstToUSD = 0;
+      user.totalBalanceInUSD = '$0';
     }
 
     if (user.tier !== 'None') {
@@ -435,6 +459,25 @@ export class AuthService {
       // Fetch the current request count from AWS
       user.requestCount = await this.awsService.getRequestCountForApiKey(
         user,
+        user.tier,
+        startDate,
+        endDate,
+      );
+    }
+    if (user.rpcTier !== 'None') {
+      const currentDate = new Date();
+      const startDate = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      )
+        .toISOString()
+        .split('T')[0]; // Format: YYYY-MM-DD
+      const endDate = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      // Fetch the current request count from AWS
+      user.rpcRequestCount = await this.awsService.getRequestCountForApiKey(
+        user,
+        user.rpcTier,
         startDate,
         endDate,
       );
@@ -451,24 +494,43 @@ export class AuthService {
         throw new NotFoundException('User not found');
       }
 
-      // Generate a JWT token for confirmation
-      const deletionToken = this.jwtService.sign(
-        { userId: user.id },
-        {
-          secret: process.env.DELETION_TOKEN_SECRET,
-          expiresIn: process.env.DELETION_TOKEN_EXPIRATION, // E.g., '1h'
-        },
-      );
+      if (user.email) {
+        // Generate a JWT token for confirmation
+        const deletionToken = this.jwtService.sign(
+          { userId: user.id },
+          {
+            secret: process.env.DELETION_TOKEN_SECRET,
+            expiresIn: process.env.DELETION_TOKEN_EXPIRATION, // E.g., '1h'
+          },
+        );
+        // Send email for deletion confirmation
+        await this.mailService.sendDeletionConfirmation(
+          user.email,
+          deletionToken,
+        );
 
-      // Send email for deletion confirmation
-      await this.mailService.sendDeletionConfirmation(
-        user.email,
-        deletionToken,
-      );
+        return {
+          message: 'A confirmation email has been sent for account deletion.',
+        };
+      } else {
+        await this.paymentService.deleteCustomer(user.stripeCustomerId);
 
-      return {
-        message: 'A confirmation email has been sent for account deletion.',
-      };
+        if (user.apiKeyId && user.tier !== 'None') {
+          await this.awsService.removeApiKeyTierAssociation(
+            user.apiKeyId,
+            user.tier,
+          );
+        }
+        if (user.apiKeyId && user.rpcTier !== 'None') {
+          await this.awsService.removeApiKeyTierAssociation(
+            user.apiKeyId,
+            user.rpcTier,
+          );
+        }
+        await this.removeApiKey(user);
+        await this.userRepository.remove(user);
+        return { message: 'User account has been deleted successfully.' };
+      }
     } catch (error) {
       this.logger.error(
         `Failed to initiate user deletion for user ID: ${userId}`,
@@ -494,6 +556,14 @@ export class AuthService {
 
       await this.paymentService.deleteCustomer(user.stripeCustomerId);
 
+      await this.awsService.removeApiKeyTierAssociation(
+        user.apiKeyId,
+        user.tier,
+      );
+      await this.awsService.removeApiKeyTierAssociation(
+        user.apiKeyId,
+        user.rpcTier,
+      );
       await this.removeApiKey(user);
       await this.userRepository.remove(user);
 

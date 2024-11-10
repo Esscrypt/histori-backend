@@ -16,16 +16,13 @@ export class ApiRequesterService {
     this.logger.debug('Fetching ERC-20 token data...');
 
     try {
-      const apiKey = this.configService.get<string>('API_KEY'); // Fetch API key from .env
-
-      await axios.get(
-        'https://api.histori.xyz/v1/eth-mainnet/tokens?token_type=erc20',
-        {
-          headers: {
-            'x-api-key': apiKey, // Set the x-api-key header
-          },
+      const apiKey = this.configService.get<string>('HISTORI_API_KEY'); // Fetch API key from .env
+      const baseUrl = this.configService.get<string>('HISTORI_API_BASE_URL'); // Fetch API base URL from .env
+      await axios.get(`${baseUrl}/tokens?token_type=erc20`, {
+        headers: {
+          'x-api-key': apiKey, // Set the x-api-key header
         },
-      );
+      });
 
       // Log the response or process it as needed
       // this.logger.debug('Token Data:', response.data);

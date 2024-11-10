@@ -133,14 +133,17 @@ export class AuthController {
     description: 'Invalid email or user not found.',
   })
   async updateEmail(@Body() mailChangeDto: MailChangeDto, @Req() req) {
-    const user = await this.userRepository.findOne({
-      where: { email: mailChangeDto.email },
-    });
-    if (user) {
-      throw new BadRequestException('Email already in use');
-    }
+    //This check might not be necessary
+    // const user = await this.userRepository.findOne({
+    //   where: { email: mailChangeDto.email },
+    // });
+    // if (user && user.id !== req.user.id) {
+    //   throw new BadRequestException('Email belongs to another user');
+    // }
 
-    this.logger.log(`Updating confirmation email for: ${mailChangeDto.email}`);
+    this.logger.log(
+      `Sending mail change confirmation email for: ${mailChangeDto.email}`,
+    );
     return this.authService.sendConfirmation(mailChangeDto.email, req.user.id);
   }
 

@@ -29,10 +29,10 @@ export class User {
   @Column({ unique: true, nullable: true })
   githubId: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true })
   @ApiProperty({ description: 'Email address of the user', uniqueItems: true })
   @IsEmail({}, { message: 'Invalid email address' })
-  email: string;
+  email?: string;
 
   @Column({ nullable: true })
   @ApiProperty({ description: 'Password for the user account' })
@@ -60,30 +60,23 @@ export class User {
   @ApiProperty({ description: 'API key id for the user to access APIs' })
   apiKeyValue: string;
 
-  @Column({
-    type: 'enum',
-    enum: ['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'],
-    default: 'Free',
-  })
-  @ApiProperty({
-    description: 'API tier assigned to the user',
-    enum: ['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'],
-    default: 'Free',
-  })
-  @IsEnum(['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'], {
-    message:
-      'Tier must be one of the following: Free, Starter, Growth, Business, Enterprise, None',
-  })
-  tier: string;
-
   @Column({ default: 0 })
   requestCount: number;
 
   @Column({ default: 5000 })
   @ApiProperty({
-    description: 'Custom rate limit for the user. Meant for enterprise users.',
+    description: 'API rate limit for the user.',
   })
   requestLimit: number;
+
+  @Column({ default: 0 })
+  rpcRequestCount: number;
+
+  @Column({ default: 5000 })
+  @ApiProperty({
+    description: 'RPC MultiNode rate limit for the user.',
+  })
+  rpcRequestLimit: number;
 
   @Column({ nullable: true })
   @ApiPropertyOptional({
@@ -109,11 +102,76 @@ export class User {
   @ApiProperty({ description: 'The date the user was created' })
   createdAt: Date;
 
+  @Column({
+    type: 'enum',
+    enum: ['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'],
+    default: 'Free',
+  })
+  @ApiProperty({
+    description: 'API tier assigned to the user',
+    enum: ['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'],
+    default: 'Free',
+  })
+  @IsEnum(['Free', 'Starter', 'Growth', 'Business', 'Enterprise', 'None'], {
+    message:
+      'Tier must be one of the following: Free, Starter, Growth, Business, Enterprise, None',
+  })
+  tier: string;
+
+  @Column({ nullable: true })
+  planEndDate?: Date;
+
+  @Column({
+    type: 'enum',
+    enum: [
+      'Free Archival MultiNode',
+      'Starter Archival MultiNode',
+      'Growth Archival MultiNode',
+      'Business Archival MultiNode',
+      'Enterprise Archival MultiNode',
+      'None',
+    ],
+    default: 'Free Archival MultiNode',
+  })
+  @ApiProperty({
+    description: 'API tier assigned to the user',
+    enum: [
+      'Free Archival MultiNode',
+      'Starter Archival MultiNode',
+      'Growth Archival MultiNode',
+      'Business Archival MultiNode',
+      'Enterprise Archival MultiNode',
+      'None',
+    ],
+    default: 'Free Archival MultiNode',
+  })
+  @IsEnum(
+    [
+      'Free Archival MultiNode',
+      'Starter Archival MultiNode',
+      'Growth Archival MultiNode',
+      'Business Archival MultiNode',
+      'Enterprise Archival MultiNode',
+      'None',
+    ],
+    {
+      message:
+        'Tier must be one of the following: Free, Starter, Growth, Business, Enterprise, None',
+    },
+  )
+  rpcTier: string;
+
+  @Column({ nullable: true })
+  rpcPlanEndDate?: Date;
+
   @Column({ nullable: true })
   @ApiPropertyOptional({
     description: 'Current Stripe subscription ID for the user',
   })
   subscriptionId?: string; // Store the current active subscription ID
+
+  @Column({ nullable: true })
+  projectId?: string;
 
   private tempPassword: string;
 
@@ -133,7 +191,7 @@ export class User {
 
   @BeforeInsert()
   generateReferralCode() {
-    this.referralCode = `${uuidv4()}`;
+    this.referralCode = `${uuidv4().slice(0, 8)}`;
   }
 
   async comparePassword(enteredPassword: string): Promise<boolean> {
