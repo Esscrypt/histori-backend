@@ -369,7 +369,11 @@ export class PaymentsService {
 
   async deleteCustomer(stripeCustomerId: string): Promise<void> {
     try {
-      await this.stripeClient.customers.del(stripeCustomerId);
+      const customerExists =
+        await this.stripeClient.customers.retrieve(stripeCustomerId);
+      if (stripeCustomerId && customerExists) {
+        await this.stripeClient.customers.del(stripeCustomerId);
+      }
     } catch (error: any) {
       this.logger.error(`Error deleting customer: ${error.message}`);
     }
