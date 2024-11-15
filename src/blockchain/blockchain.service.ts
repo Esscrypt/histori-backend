@@ -51,7 +51,7 @@ export class BlockchainService implements OnModuleInit {
     private configService: ConfigService,
   ) {
     const request = new ethers.FetchRequest(process.env.HISTORI_RPC_URL);
-    if (process.env.RPC_HAS_CREDENTIALS === 'true') {
+    if (process.env.RPC_HAS_CREDENTIALS) {
       request.setCredentials(process.env.USERNAME, process.env.PASSWORD);
     }
     this.provider = new ethers.JsonRpcProvider(request);

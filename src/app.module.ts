@@ -69,7 +69,7 @@ import { HttpModule } from '@nestjs/axios';
     OAuthService,
     AWSService,
     AuthService,
-    ApiRequesterService,
+    // ApiRequesterService, // Commented out to prevent the cron job from running. Enable this line to run the lambda keep warm cron job
     BlockchainService,
   ],
   exports: [AuthService, BlockchainService],
