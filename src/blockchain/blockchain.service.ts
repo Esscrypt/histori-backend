@@ -7,7 +7,7 @@ import {
 import { ethers } from 'ethers';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import axios from 'axios';
+// import axios from 'axios';
 import { User } from 'src/auth/entities/user.entity';
 import { Cron } from '@nestjs/schedule';
 import { v4 as uuidv4 } from 'uuid';
@@ -52,7 +52,7 @@ export class BlockchainService implements OnModuleInit {
   ) {
     const request = new ethers.FetchRequest(process.env.HISTORI_RPC_URL);
     if (process.env.RPC_HAS_CREDENTIALS) {
-      request.setCredentials(process.env.USERNAME, process.env.PASSWORD);
+      request.setCredentials(process.env.USERNAME!, process.env.PASSWORD!);
     }
     this.provider = new ethers.JsonRpcProvider(request);
 

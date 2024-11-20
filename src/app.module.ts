@@ -12,13 +12,16 @@ import { JwtService } from '@nestjs/jwt';
 import { AWSService } from './awsservice/awsservice.service';
 import { UsagePlansModule } from './usage-plans/usage-plans.module';
 import { UsagePlan } from './usage-plans/entities/usage-plan.entity';
-import { ApiRequesterService } from './api-requester/api-requester.service';
+// import { ApiRequesterService } from './api-requester/api-requester.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BlockchainService } from './blockchain/blockchain.service';
 import { BlockchainController } from './blockchain/blockchain.controller';
 import { AuthService } from './auth/services/auth.service';
 import { OAuthService } from './auth/services/oauth.service';
 import { HttpModule } from '@nestjs/axios';
+import { QuicknodeController } from './quicknode/quicknode.controller';
+import { QuicknodeService } from './quicknode/quicknode.service';
+import { QuicknodeEntity } from './quicknode/entities/quicknode-provision.entity';
 
 @Module({
   imports: [
@@ -36,7 +39,7 @@ import { HttpModule } from '@nestjs/axios';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([User, UsagePlan]),
+    TypeOrmModule.forFeature([User, UsagePlan, QuicknodeEntity]),
     ThrottlerModule.forRoot([
       {
         ttl: 1000,
@@ -71,8 +74,9 @@ import { HttpModule } from '@nestjs/axios';
     AuthService,
     // ApiRequesterService, // Commented out to prevent the cron job from running. Enable this line to run the lambda keep warm cron job
     BlockchainService,
+    QuicknodeService,
   ],
   exports: [AuthService, BlockchainService],
-  controllers: [PaymentsController, BlockchainController],
+  controllers: [PaymentsController, BlockchainController, QuicknodeController],
 })
 export class AppModule {}

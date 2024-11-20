@@ -175,6 +175,12 @@ export class User {
 
   private tempPassword: string;
 
+  @Column({ nullable: true })
+  @ApiPropertyOptional({
+    description: 'QuickNode ID associated with the user',
+  })
+  quicknodeId?: string;
+
   @AfterLoad()
   private loadTempPassword(): void {
     this.tempPassword = this.password;
