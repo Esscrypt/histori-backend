@@ -283,18 +283,25 @@ export class AuthService {
       secret: process.env.CONFIRMATION_TOKEN_SECRET,
     });
 
-    const user = await this.userRepository.findOne({
+    let user = await this.userRepository.findOne({
       where: { id: decoded.userId },
     });
-    if (!user) throw new BadRequestException('Invalid token');
-    if (!user.email) {
+    if (!user) {
+      user = await this.userRepository.findOne({
+        where: { id: decoded['quicknode_id'] },
+      });
+    }
+    if (!user) {
+      throw new BadRequestException('Invalid token');
+    }
+    if (!user.email && decoded.email) {
       user.email = decoded.email;
-      await this.userRepository.save(user);
     }
     if (!user.isActive) {
       user.isActive = true;
-      await this.userRepository.save(user);
     }
+
+    await this.userRepository.save(user);
 
     return this.generateTokens(user);
   }
@@ -628,5 +635,4 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired token.');
     }
   }
-
 }
