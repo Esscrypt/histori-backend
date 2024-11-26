@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { QuicknodeEntity } from './entities/quicknode-provision.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -6,6 +6,8 @@ import { User } from 'src/auth/entities/user.entity';
 
 @Injectable()
 export class QuicknodeService {
+  private readonly logger = new Logger(QuicknodeService.name);
+
   constructor(
     @InjectRepository(QuicknodeEntity)
     private readonly quicknodeRepository: Repository<QuicknodeEntity>,
@@ -13,6 +15,7 @@ export class QuicknodeService {
     private readonly userRepository: Repository<User>,
   ) {}
   async provisionService(data: any): Promise<any> {
+    this.logger.log(data);
     const { 'quicknode-id': quicknodeId } = data;
 
     const existingService = await this.quicknodeRepository.findOne({
@@ -48,6 +51,7 @@ export class QuicknodeService {
   }
 
   async updateService(data: any): Promise<any> {
+    this.logger.log(data);
     const {
       'quicknode-id': quicknodeId,
       plan,

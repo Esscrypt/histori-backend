@@ -13,7 +13,6 @@ import { Cron } from '@nestjs/schedule';
 import { v4 as uuidv4 } from 'uuid';
 import { AWSService } from 'src/awsservice/awsservice.service';
 import { PaymentsService } from 'src/payments/payments.service';
-import { ConfigService } from '@nestjs/config';
 
 import bn from 'bignumber.js'; // Importing bignumber.js for precision control
 
@@ -48,13 +47,8 @@ export class BlockchainService implements OnModuleInit {
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly paymentService: PaymentsService,
     private readonly awsService: AWSService,
-    private configService: ConfigService,
   ) {
-    const request = new ethers.FetchRequest(process.env.HISTORI_RPC_URL);
-    if (process.env.RPC_HAS_CREDENTIALS) {
-      request.setCredentials(process.env.USERNAME!, process.env.PASSWORD!);
-    }
-    this.provider = new ethers.JsonRpcProvider(request);
+    this.provider = new ethers.JsonRpcProvider(process.env.HISTORI_RPC_URL);
 
     this.contract = new ethers.Contract(
       process.env.DEPOSIT_ADDRESS,

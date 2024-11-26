@@ -34,7 +34,7 @@ import { QuicknodeEntity } from './quicknode/entities/quicknode-provision.entity
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
         url: configService.get<string>('DATABASE_URL'),
-        entities: [User, UsagePlan],
+        entities: [User, UsagePlan, QuicknodeEntity],
         synchronize: true, // Only synchronize in development
       }),
       inject: [ConfigService],
