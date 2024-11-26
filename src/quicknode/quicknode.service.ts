@@ -96,7 +96,11 @@ export class QuicknodeService {
       await this.userRepository.save(user);
     }
 
-    return { status: 'success' };
+    return {
+      status: 'success',
+      'dashboard-url': 'http://histori.xyz/signin',
+      'access-url': `https://docs.histori.xyz/docs/api/histori-multichain-data-api`,
+    };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -110,7 +114,11 @@ export class QuicknodeService {
     //   throw new HttpException('Endpoint not found', HttpStatus.NOT_FOUND);
     // }
     // this.services.delete(quicknodeId);
-    return { status: 'success' };
+    return {
+      status: 'success',
+      'dashboard-url': 'http://histori.xyz/signin',
+      'access-url': `https://docs.histori.xyz/docs/api/histori-multichain-data-api`,
+    };
   }
 
   // TODO: check if quicknodeId is associated with RPC Plan or REST API Plan
