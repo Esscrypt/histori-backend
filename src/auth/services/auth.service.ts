@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { MailService } from './mail.service';
 import { JwtService } from '@nestjs/jwt';
@@ -66,13 +66,23 @@ export class AuthService {
     isActive?: boolean;
     githubId?: string;
     referrerCode?: string;
+    plan?: string;
+    quicknodeId?: string;
   }): Promise<User> {
-    const { web3Address, email, password, isActive, githubId, referrerCode } =
-      options;
+    const {
+      web3Address,
+      email,
+      password,
+      isActive,
+      githubId,
+      referrerCode,
+      plan,
+      quicknodeId,
+    } = options;
     const stripeCustomerId =
       await this.paymentService.createStripeCustomer(email);
 
-    const user = this.userRepository.create({
+    let userDto: DeepPartial<User> = {
       email,
       password,
       isActive: isActive === undefined ? true : isActive,
@@ -80,7 +90,31 @@ export class AuthService {
       web3Address,
       stripeCustomerId,
       referrerCode,
-    });
+    };
+
+    if (plan) {
+      const isRPCPlan = plan.includes('MultiNode');
+      if (isRPCPlan) {
+        userDto = {
+          ...userDto,
+          rpcTier: plan,
+        };
+      } else {
+        userDto = {
+          ...userDto,
+          tier: plan,
+        };
+      }
+    }
+
+    if (quicknodeId) {
+      userDto = {
+        ...userDto,
+        quicknodeId,
+      };
+    }
+
+    const user = this.userRepository.create(userDto);
 
     const apiKey = await this.awsService.createAwsApiGatewayKey();
     this.logger.log(`API key created:`, JSON.stringify(apiKey));
@@ -89,15 +123,36 @@ export class AuthService {
     const prefix = this.generateRandomString();
     const suffix = this.generateRandomString();
     user.projectId = `${prefix}${apiKey.id}${suffix}`;
-    user.tier = 'Free'; // Default tier for new users
-    user.rpcTier = 'Free Archival MultiNode'; // Default tier for new users
-    // Associate the API key with a usage plan
-    await this.awsService.associateKeyWithUsagePlan(apiKey.id, 'Free', 'Free');
-    await this.awsService.associateKeyWithUsagePlan(
-      apiKey.id,
-      'Free Archival MultiNode',
-      'Free Archival MultiNode',
-    );
+    if (plan) {
+      const isRPCPlan = plan.includes('MultiNode');
+      user.tier = isRPCPlan ? 'Free' : plan;
+      user.rpcTier = isRPCPlan ? plan : 'Free Archival MultiNode';
+
+      await this.awsService.associateKeyWithUsagePlan(
+        apiKey.id,
+        'Free',
+        user.tier,
+      );
+      await this.awsService.associateKeyWithUsagePlan(
+        apiKey.id,
+        'Free Archival MultiNode',
+        user.rpcTier,
+      );
+    } else {
+      user.tier = 'Free'; // Default tier for new users
+      user.rpcTier = 'Free Archival MultiNode'; // Default tier for new users
+      // Associate the API key with a usage plan
+      await this.awsService.associateKeyWithUsagePlan(
+        apiKey.id,
+        'Free',
+        'Free',
+      );
+      await this.awsService.associateKeyWithUsagePlan(
+        apiKey.id,
+        'Free Archival MultiNode',
+        'Free Archival MultiNode',
+      );
+    }
 
     return await this.userRepository.save(user);
   }
@@ -572,5 +627,31 @@ export class AuthService {
       this.logger.error('Failed to confirm user deletion', error.stack);
       throw new BadRequestException('Invalid or expired token.');
     }
+  }
+
+  private isRPCTier(tier: string): boolean {
+    return tier.includes('MultiNode');
+  }
+
+  async resetTier(user: User, plan: string) {
+    if (this.isRPCTier(plan)) {
+      await this.awsService.removeApiKeyTierAssociation(
+        user.apiKeyId,
+        user.rpcTier,
+      );
+      user.rpcTier = 'None';
+      user.rpcRequestLimit = 0;
+      console.log(`Removed API key for user: ${user.id}`);
+    } else {
+      await this.awsService.removeApiKeyTierAssociation(
+        user.apiKeyId,
+        user.tier,
+      );
+      user.tier = 'None';
+      user.requestLimit = 0;
+      console.log(`Removed API key for user: ${user.id}`);
+    }
+
+    await this.userRepository.save(user);
   }
 }

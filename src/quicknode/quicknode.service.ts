@@ -3,6 +3,8 @@ import { QuicknodeEntity } from './entities/quicknode-provision.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from 'src/auth/entities/user.entity';
+import { AuthService } from 'src/auth/services/auth.service';
+import { AWSService } from 'src/awsservice/awsservice.service';
 
 @Injectable()
 export class QuicknodeService {
@@ -13,7 +15,10 @@ export class QuicknodeService {
     private readonly quicknodeRepository: Repository<QuicknodeEntity>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly authService: AuthService,
+    private readonly awsService: AWSService,
   ) {}
+
   async provisionService(data: any): Promise<any> {
     this.logger.log(data);
     const { 'quicknode-id': quicknodeId } = data;
@@ -41,11 +46,16 @@ export class QuicknodeService {
       plan: data.plan,
     });
 
+    this.authService.createNewUser({
+      plan: data.plan,
+      quicknodeId,
+    });
+
     await this.quicknodeRepository.save(newService);
 
     return {
       status: 'success',
-      'dashboard-url': 'http://histori.xyz/provider=jwt&code=',
+      'dashboard-url': 'http://histori.xyz/signin',
       'access-url': `https://docs.histori.xyz/docs/api/histori-multichain-data-api`,
     };
   }
@@ -103,17 +113,17 @@ export class QuicknodeService {
     return { status: 'success' };
   }
 
+  // TODO: check if quicknodeId is associated with RPC Plan or REST API Plan
   async deprovisionService(data: any): Promise<any> {
-    const { 'quicknode-id': quicknodeId } = data;
+    this.logger.log(data);
+    const { 'quicknode-id': quicknodeId, plan } = data;
 
     const user = await this.userRepository.findOne({
       where: { quicknodeId },
     });
 
     if (user) {
-      user.tier = 'None';
-
-      await this.userRepository.save(user);
+      await this.authService.resetTier(user, plan);
     } else {
       return { status: 'error' };
     }
