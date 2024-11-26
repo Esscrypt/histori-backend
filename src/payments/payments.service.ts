@@ -8,9 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from 'src/auth/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
-import { MailService } from 'src/auth/services/mail.service';
 import { AWSService } from 'src/awsservice/awsservice.service';
-import { AuthService } from 'src/auth/services/auth.service';
 
 @Injectable()
 export class PaymentsService {
@@ -21,11 +19,32 @@ export class PaymentsService {
     @InjectStripeClient() stripeClient: Stripe,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private configService: ConfigService,
-    private readonly mailService: MailService,
+    // private readonly mailService: MailService,
     private readonly awsService: AWSService, // Inject AWSService
-    private readonly authService: AuthService,
   ) {
     this.stripeClient = stripeClient;
+  }
+
+  async resetTier(user: User, plan: string) {
+    if (this.isRPCTier(plan)) {
+      await this.awsService.removeApiKeyTierAssociation(
+        user.apiKeyId,
+        user.rpcTier,
+      );
+      user.rpcTier = 'None';
+      user.rpcRequestLimit = 0;
+      console.log(`Removed API key for user: ${user.id}`);
+    } else {
+      await this.awsService.removeApiKeyTierAssociation(
+        user.apiKeyId,
+        user.tier,
+      );
+      user.tier = 'None';
+      user.requestLimit = 0;
+      console.log(`Removed API key for user: ${user.id}`);
+    }
+
+    await this.userRepository.save(user);
   }
 
   @StripeWebhookHandler('customer.subscription.created')
@@ -191,7 +210,7 @@ export class PaymentsService {
     // Handle the deletion (remove API keys, etc.)
     try {
       if (user.apiKeyId) {
-        this.authService.resetTier(user, deletedTier);
+        this.resetTier(user, deletedTier);
       }
     } catch (error: any) {
       this.logger.error(

@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from 'src/auth/entities/user.entity';
 import { AuthService } from 'src/auth/services/auth.service';
-import { AWSService } from 'src/awsservice/awsservice.service';
+import { PaymentsService } from 'src/payments/payments.service';
 
 @Injectable()
 export class QuicknodeService {
@@ -16,7 +16,7 @@ export class QuicknodeService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly authService: AuthService,
-    private readonly awsService: AWSService,
+    private readonly paymentService: PaymentsService,
   ) {}
 
   async provisionService(data: any): Promise<any> {
@@ -123,7 +123,7 @@ export class QuicknodeService {
     });
 
     if (user) {
-      await this.authService.resetTier(user, plan);
+      await this.paymentService.resetTier(user, plan);
     } else {
       return { status: 'error' };
     }

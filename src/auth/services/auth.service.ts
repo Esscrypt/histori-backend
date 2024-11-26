@@ -629,29 +629,4 @@ export class AuthService {
     }
   }
 
-  private isRPCTier(tier: string): boolean {
-    return tier.includes('MultiNode');
-  }
-
-  async resetTier(user: User, plan: string) {
-    if (this.isRPCTier(plan)) {
-      await this.awsService.removeApiKeyTierAssociation(
-        user.apiKeyId,
-        user.rpcTier,
-      );
-      user.rpcTier = 'None';
-      user.rpcRequestLimit = 0;
-      console.log(`Removed API key for user: ${user.id}`);
-    } else {
-      await this.awsService.removeApiKeyTierAssociation(
-        user.apiKeyId,
-        user.tier,
-      );
-      user.tier = 'None';
-      user.requestLimit = 0;
-      console.log(`Removed API key for user: ${user.id}`);
-    }
-
-    await this.userRepository.save(user);
-  }
 }
