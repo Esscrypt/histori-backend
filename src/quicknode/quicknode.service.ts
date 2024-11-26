@@ -136,6 +136,10 @@ export class QuicknodeService {
       return { status: 'error' };
     }
 
-    return { status: 'success' };
+    return {
+      status: 'success',
+      'dashboard-url': 'http://histori.xyz/signin',
+      'access-url': `https://docs.histori.xyz/docs/api/histori-multichain-data-api`,
+    };
   }
 }
