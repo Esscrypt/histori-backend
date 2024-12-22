@@ -25,6 +25,12 @@ export class QuicknodeService {
     private readonly paymentService: PaymentsService,
   ) {}
 
+  healthCheck() {
+    return {
+      status: 'success',
+    };
+  }
+
   async provisionService(data: any): Promise<any> {
     this.logger.log(data);
     const { 'quicknode-id': quicknodeId } = data;

@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Get,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { QuicknodeService } from './quicknode.service';
@@ -46,6 +47,17 @@ export class QuicknodeController {
   @HttpCode(HttpStatus.OK)
   update(@Body() data: any) {
     return this.quicknodeService.updateService(data);
+  }
+
+  @Get('healthcheck')
+  @ApiOperation({ summary: 'Healthcheck' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Healthcheck successfull.',
+  })
+  @HttpCode(HttpStatus.OK)
+  healthcheck() {
+    return this.quicknodeService.healthCheck();
   }
 
   @Delete('deactivate')
