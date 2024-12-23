@@ -17,13 +17,14 @@ import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { PaymentsService } from 'src/payments/payments.service';
 import { OAuthService } from './oauth.service';
-import { HttpService } from '@nestjs/axios';
+// import { HttpService } from '@nestjs/axios';
 import { ethers } from 'ethers';
 import { AWSService } from 'src/awsservice/awsservice.service';
-import { BlockchainService } from 'src/blockchain/blockchain.service';
+// import { BlockchainService } from 'src/blockchain/blockchain.service';
 import { v4 as uuidv4 } from 'uuid';
 
 import bn from 'bignumber.js'; // Importing bignumber.js for precision control
+import axios from 'axios';
 
 @Injectable()
 export class AuthService {
@@ -36,9 +37,7 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly paymentService: PaymentsService,
     private readonly oAuthService: OAuthService,
-    private readonly httpService: HttpService,
     private readonly awsService: AWSService,
-    private readonly blockchainService: BlockchainService,
   ) {}
 
   private generateRandomString(): string {
@@ -375,9 +374,16 @@ export class AuthService {
 
   // Verify reCAPTCHA token
   async verifyCaptcha(token: string): Promise<boolean> {
+    const payload = {
+      event: {
+        token: token,
+        siteKey: '6Ld6hU4qAAAAAFlfhkFGbDdQVoTUm6MKQGTN2OIA',
+      },
+    };
     const secret = process.env.RECAPTCHA_SECRET_KEY;
-    const verificationUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}`;
-    const response = await this.httpService.post(verificationUrl).toPromise();
+    const verificationUrl = `https://recaptchaenterprise.googleapis.com/v1/projects/histori-1727094431021/assessments?key=${secret}`;
+    const response = await axios.post(verificationUrl, payload);
+    this.logger.log('reCAPTCHA verification response:', response.data);
     return response.data.success;
   }
 
