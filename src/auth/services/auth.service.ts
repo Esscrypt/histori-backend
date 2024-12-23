@@ -383,7 +383,7 @@ export class AuthService {
     const secret = process.env.RECAPTCHA_SECRET_KEY;
     const verificationUrl = `https://recaptchaenterprise.googleapis.com/v1/projects/histori-1727094431021/assessments?key=${secret}`;
     const response = await axios.post(verificationUrl, payload);
-    const isValid = response.data.event.tokenProperties.valid;
+    const isValid = response.data.tokenProperties.valid;
     if (!isValid) {
       this.logger.log('reCAPTCHA verification response:', response.data);
     }
