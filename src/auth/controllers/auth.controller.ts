@@ -101,8 +101,6 @@ export class AuthController {
       contactDto.captchaToken,
     );
     if (!isCaptchaValid) {
-      this.logger.debug('Invalid CAPTCHA');
-      this.logger.debug(contactDto.captchaToken);
       throw new BadRequestException('Invalid CAPTCHA');
     }
 
