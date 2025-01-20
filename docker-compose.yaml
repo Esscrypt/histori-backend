@@ -23,7 +23,7 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
     depends_on:
-      - db
+      - histori-db
     volumes:
       - .:/usr/src/backend
       - /usr/src/backend/node_modules
