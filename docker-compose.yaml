@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   # Postgres database service
-  db:
+  histori-db:
     image: postgres:15
     container_name: postgres-db
     environment:
@@ -11,10 +11,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    network_mode: "host"  # Use host network
+    ports:
+      - "5432:5433"
 
   # Backend service
-  backend:
+  histori-backend:
     build:
       context: .
       dockerfile: ${BACKEND_DOCKERFILE}
@@ -28,19 +29,6 @@ services:
       - /usr/src/backend/node_modules
     network_mode: "host"  # Use host network
 
-  # Stripe CLI listener service
-  stripe-listener:
-    image: stripe/stripe-cli
-    container_name: stripe-listener
-    entrypoint: >
-      sh -c "
-        stripe listen --forward-to localhost:4242/stripe/webhook
-      "
-    environment:
-      - STRIPE_API_KEY=${STRIPE_API_KEY}
-    depends_on:
-      - backend
-    network_mode: "host"  # Use host network
 
 volumes:
   postgres-data:
